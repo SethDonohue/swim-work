@@ -1,0 +1,13 @@
+name = "swim-work"
+compatibility_date = "2026-06-24"
+
+# Serve the static files in the repo root, plus the /functions Pages Functions.
+pages_build_output_dir = "."
+
+# Cloudflare D1 database binding used by functions/api/entries.js.
+# Create it once with:  npx wrangler d1 create swim-work
+# then paste the returned database_id below (and into the Pages project settings).
+[[d1_databases]]
+binding = "DB"
+database_name = "swim-work"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"

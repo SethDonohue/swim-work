@@ -1,0 +1,17 @@
+{
+  "name": "swim-work",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Seattle swim spots paired with cafes & shaded parks for remote work.",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "wrangler pages dev .",
+    "test": "node --test",
+    "db:create": "wrangler d1 create swim-work",
+    "db:init:local": "wrangler d1 execute swim-work --local --file=./schema.sql",
+    "db:init:remote": "wrangler d1 execute swim-work --remote --file=./schema.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

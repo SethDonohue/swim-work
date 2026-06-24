@@ -1,0 +1,275 @@
+/*
+ * Swim + Work Seattle — curated spots.
+ *
+ * Each spot pairs a swimmable (or water-adjacent) area with nearby
+ * remote-work options (cafe / shaded park).
+ *
+ * swimType drives the badge + the "swimmable only" filter:
+ *   'Lifeguarded beach' | 'Heated pool' | 'Saltwater beach'
+ *   'Beach (no lifeguard)' | 'Tide pools' | 'No swimming'
+ *
+ * Notes on the season: Seattle Parks runs FREE lifeguarded beaches roughly
+ * late June – early September (2026: ~Jun 27 – Sep 7). Puget Sound spots
+ * (Alki, etc.) stay cold year-round (~46–56°F); lake + Green Lake are warmer.
+ */
+const SPOTS = [
+  // ---------------------------------------------------------------------------
+  // LAKE WASHINGTON (west + south shore, plus NE)
+  // ---------------------------------------------------------------------------
+  {
+    id: 'madison-park-beach',
+    name: 'Madison Park Beach',
+    area: 'Lake Washington',
+    address: '1900 43rd Ave E, Seattle, WA 98112',
+    swimType: 'Lifeguarded beach',
+    water: 'Fresh',
+    swim: 'Sandy, calm, lifeguarded in summer — one of the nicer Lake Washington swims.',
+    cafe: 'Corner Delights (2719 E Madison St) is explicitly remote-work friendly (fast wifi + outlets); Arosa Cafe and a Starbucks are also a short walk.',
+    shade: 'Grassy, tree-lined park areas right at the beach.',
+    tags: ['lifeguarded', 'freshwater', 'wifi-cafe', 'shaded', 'sandy'],
+  },
+  {
+    id: 'madrona-beach',
+    name: 'Madrona Park Beach',
+    area: 'Lake Washington',
+    address: '853 Lake Washington Blvd, Seattle, WA 98122',
+    swimType: 'Lifeguarded beach',
+    water: 'Fresh',
+    swim: 'Lifeguarded; wooded hillside drops to a grassy swim area with a lakeside jogging path.',
+    cafe: 'Up the hill on the Madrona strip (34th Ave); Temple Pastries (Leschi/Central, ~100Mbps wifi, lots of seating) is a short drive.',
+    shade: 'Wooded hillside — genuinely shady.',
+    tags: ['lifeguarded', 'freshwater', 'shaded'],
+  },
+  {
+    id: 'mount-baker-beach',
+    name: 'Mount Baker Beach',
+    area: 'Lake Washington',
+    address: '2521 Lake Park Dr S, Seattle, WA 98144',
+    swimType: 'Lifeguarded beach',
+    water: 'Fresh',
+    swim: 'Lifeguarded summer beach with a swim float (1-meter board some years).',
+    cafe: 'Mount Baker / Columbia City cafes a short drive; Caffe Vita Seward Park is nearby.',
+    shade: 'Mount Baker Park has trees + lawn behind the beach.',
+    tags: ['lifeguarded', 'freshwater', 'shaded'],
+  },
+  {
+    id: 'seward-park-beach',
+    name: 'Seward Park Beach',
+    area: 'Lake Washington',
+    address: '5900 Lake Washington Blvd S, Seattle, WA 98118',
+    swimType: 'Lifeguarded beach',
+    water: 'Fresh',
+    swim: 'Lifeguarded beach on a forested peninsula; warm freshwater in summer.',
+    cafe: 'Caffe Vita Seward Park (5028 Wilson Ave S) — very work-friendly, outlets + free wifi, 6a–6p.',
+    shade: 'Old-growth forest loop = excellent shade. Top pick for a shaded work day.',
+    tags: ['lifeguarded', 'freshwater', 'wifi-cafe', 'shaded', 'top-pick'],
+  },
+  {
+    id: 'pritchard-island-beach',
+    name: 'Pritchard Island Beach',
+    area: 'Lake Washington',
+    address: '8400 55th Ave S, Seattle, WA 98118',
+    swimType: 'Lifeguarded beach',
+    water: 'Fresh',
+    swim: 'Lifeguarded neighborhood beach in Rainier Beach.',
+    cafe: 'Limited right at the beach; Rainier Beach / Columbia City options are a short drive.',
+    shade: 'Grassy park with trees.',
+    tags: ['lifeguarded', 'freshwater', 'shaded', 'quiet'],
+  },
+  {
+    id: 'matthews-beach',
+    name: 'Matthews Beach Park',
+    area: 'Lake Washington',
+    address: '5100 NE 93rd St, Seattle, WA 98115',
+    swimType: 'Lifeguarded beach',
+    water: 'Fresh',
+    swim: "Seattle's largest freshwater bathing beach; lifeguarded; sits right on the Burke-Gilman Trail.",
+    cafe: 'Cafes in Wedgwood / Sand Point a short ride away; easy trailside coffee stops.',
+    shade: 'Big park with mature trees.',
+    tags: ['lifeguarded', 'freshwater', 'shaded', 'burke-gilman'],
+  },
+  {
+    id: 'magnuson-beach',
+    name: 'Magnuson Park Swim Beach',
+    area: 'Lake Washington',
+    address: '7400 Sand Point Way NE, Seattle, WA 98115',
+    swimType: 'Lifeguarded beach',
+    water: 'Fresh',
+    swim: 'Lifeguarded daily late June–late Aug; swim platform, Mt. Rainier views, outdoor shower.',
+    cafe: 'Magnuson Cafe & Brewery (7801 62nd Ave NE) — espresso + coffee on a large covered, heated lake-view deck.',
+    shade: '350-acre park with trails; the beach itself is open, so bring shade.',
+    tags: ['lifeguarded', 'freshwater', 'lake-view-cafe', 'views'],
+  },
+  {
+    id: 'denny-blaine-park',
+    name: 'Denny Blaine Park',
+    area: 'Lake Washington',
+    address: '200 Lake Washington Blvd E, Seattle, WA 98112',
+    swimType: 'Beach (no lifeguard)',
+    water: 'Fresh',
+    swim: 'Grassy non-lifeguarded beach behind an old stone wall. Note: city plan designates a clothing-optional area here.',
+    cafe: 'Madison Park cafes (Corner Delights, Arosa) a short drive.',
+    shade: 'Small grassy beach with some tree cover.',
+    tags: ['no-lifeguard', 'freshwater', 'quiet'],
+  },
+  {
+    id: 'leschi-waterfront',
+    name: 'Leschi Park & Waterfront',
+    area: 'Lake Washington',
+    address: '201 Lakeside Ave S, Seattle, WA 98144',
+    swimType: 'Beach (no lifeguard)',
+    water: 'Fresh',
+    swim: 'Informal shoreline swimming along Lake Washington Blvd (no lifeguard); marina-adjacent.',
+    cafe: 'Starbucks (121 Lakeside Ave) right on the water; Temple Pastries (Leschi/Central) has ~100Mbps wifi and lots of seating.',
+    shade: 'Leschi Park has steep wooded slopes with big trees.',
+    tags: ['no-lifeguard', 'freshwater', 'wifi-cafe', 'shaded'],
+  },
+
+  // ---------------------------------------------------------------------------
+  // GREEN LAKE (the "in-between" sweet spot)
+  // ---------------------------------------------------------------------------
+  {
+    id: 'east-green-lake-beach',
+    name: 'East Green Lake Beach',
+    area: 'Green Lake',
+    address: '7201 E Green Lake Dr N, Seattle, WA 98115',
+    swimType: 'Lifeguarded beach',
+    water: 'Fresh',
+    swim: 'Lifeguarded; warmer and calmer than Lake Washington — great for a quick dip.',
+    cafe: 'Revolutions Coffee (7208 E Green Lake Dr N) is lakefront, no music, big tables, wifi til 8p; Starbucks (7100) has ~15 outlets.',
+    shade: 'Tree cover along the east/north side of the 2.8-mi loop.',
+    tags: ['lifeguarded', 'freshwater', 'wifi-cafe', 'shaded', 'top-pick'],
+  },
+  {
+    id: 'west-green-lake-beach',
+    name: 'West Green Lake Beach',
+    area: 'Green Lake',
+    address: '7312 W Green Lake Dr N, Seattle, WA 98103',
+    swimType: 'Lifeguarded beach',
+    water: 'Fresh',
+    swim: 'Lifeguarded; fixed platforms with a 50-yard lap lane.',
+    cafe: 'PCC Green Lake Village + west-side cafes; Retreat (6900 E Green Lake Way N) has food + a workspace vibe.',
+    shade: 'Shaded stretches along the loop trail.',
+    tags: ['lifeguarded', 'freshwater', 'lap-lane', 'shaded'],
+  },
+
+  // ---------------------------------------------------------------------------
+  // LAKE UNION / PORTAGE BAY (work + views — no legal swimming)
+  // ---------------------------------------------------------------------------
+  {
+    id: 'gas-works-park',
+    name: 'Gas Works Park',
+    area: 'Lake Union',
+    address: '2101 N Northlake Way, Seattle, WA 98103',
+    swimType: 'No swimming',
+    water: 'Fresh',
+    swim: 'NO swimming/wading — hazardous lake sediment (SMC 18.12.070). Iconic skyline views + kite hill make it a great work-with-a-view stop.',
+    cafe: 'Fremont cafes are minutes away — Milstead & Co is work-friendly with wifi and lots of seating.',
+    shade: 'Mostly open hill; limited shade (a few trees at the edges).',
+    tags: ['no-swimming', 'views', 'work-spot'],
+  },
+  {
+    id: 'lake-union-park',
+    name: 'Lake Union Park',
+    area: 'Lake Union',
+    address: '860 Terry Ave N, Seattle, WA 98109',
+    swimType: 'No swimming',
+    water: 'Fresh',
+    swim: "No swim beach (kids' spraypark only, Memorial Day–Labor Day). A short stroll to Goose Beach for wading.",
+    cafe: 'South Lake Union cafes; Happy Lemon SLU has nice outdoor urban seating in summer. MOHAI is on-site.',
+    shade: 'Some lawn + tree areas.',
+    tags: ['no-swimming', 'spraypark', 'work-spot'],
+  },
+  {
+    id: 'westward-north-union',
+    name: 'Westward / North Lake Union Shore',
+    area: 'Lake Union',
+    address: '2501 N Northlake Way, Seattle, WA 98103',
+    swimType: 'No swimming',
+    water: 'Fresh',
+    swim: 'No designated swimming; the Adirondack-chair beach is for lounging by the water with skyline views.',
+    cafe: 'Westward (restaurant/bar, waterside seating); Fremont/Wallingford coffee a few minutes away.',
+    shade: 'Waterfront patio; limited shade.',
+    tags: ['no-swimming', 'views', 'waterfront'],
+  },
+
+  // ---------------------------------------------------------------------------
+  // WEST SEATTLE
+  // ---------------------------------------------------------------------------
+  {
+    id: 'alki-beach',
+    name: 'Alki Beach Park',
+    area: 'West Seattle',
+    address: '1702 Alki Ave SW, Seattle, WA 98116',
+    swimType: 'Saltwater beach',
+    water: 'Salt',
+    swim: 'Long sandy saltwater beach; swimmable in summer for the hardy (water ~46–56°F). No lifeguard.',
+    cafe: 'Ampersand Cafe (2536 Alki Ave SW) — beachfront, water views, opens 6a; many cafes along Alki Ave.',
+    shade: 'Beach is open/sunny — bring shade. Promenade benches for breaks.',
+    tags: ['saltwater', 'no-lifeguard', 'wifi-cafe', 'sandy', 'views'],
+  },
+  {
+    id: 'colman-pool-lincoln-park',
+    name: 'Colman Pool & Lincoln Park',
+    area: 'West Seattle',
+    address: '8603 Fauntleroy Way SW, Seattle, WA 98136',
+    swimType: 'Heated pool',
+    water: 'Salt',
+    swim: 'Colman Pool — Olympic-size HEATED saltwater pool right on the beach (summer). The comfortable West Seattle swim.',
+    cafe: 'On-site options are limited; West Seattle Junction (California Ave SW) cafes are a short drive.',
+    shade: 'Lincoln Park = 4.6 mi of forested trails, picnic shelters, and meadows. Excellent shade.',
+    tags: ['heated-pool', 'saltwater', 'shaded', 'top-pick'],
+  },
+  {
+    id: 'lowman-beach',
+    name: 'Lowman Beach Park',
+    area: 'West Seattle',
+    address: '7017 Beach Dr SW, Seattle, WA 98136',
+    swimType: 'Beach (no lifeguard)',
+    water: 'Salt',
+    swim: 'Small restored shoreline with rocks + driftwood and sunset views. Informal wading; cold Sound water.',
+    cafe: 'Beach Dr / Lincoln Park area; Fauntleroy cafes a short drive.',
+    shade: 'Lawn with some trees; swings.',
+    tags: ['saltwater', 'no-lifeguard', 'sunsets', 'quiet'],
+  },
+  {
+    id: 'me-kwa-mooks',
+    name: 'Me-Kwa-Mooks Park / Emma Schmitz Overlook',
+    area: 'West Seattle',
+    address: '4430 Beach Dr SW, Seattle, WA 98116',
+    swimType: 'Tide pools',
+    water: 'Salt',
+    swim: 'Rocky beach across from the overlook — great tide pools at low tide, not really a swimming spot.',
+    cafe: 'A few spots along Beach Dr; Alki cafes are to the north.',
+    shade: 'Dense hillside trees (screech-owl habitat) — very shaded.',
+    tags: ['tide-pools', 'shaded', 'nature'],
+  },
+  {
+    id: 'constellation-park',
+    name: 'Constellation Park (Charles Richey Sr. Viewpoint)',
+    area: 'West Seattle',
+    address: '3521 Beach Dr SW, Seattle, WA 98116',
+    swimType: 'Tide pools',
+    water: 'Salt',
+    swim: 'Tide-pooling beach south of Alki Point (sea stars, anemones). Not for swimming; no restrooms or shade on-site.',
+    cafe: 'Alki Ave cafes (e.g. Ampersand) ~7 min north.',
+    shade: 'None on-site — exposed shoreline.',
+    tags: ['tide-pools', 'views'],
+  },
+  {
+    id: 'jack-block-park',
+    name: 'Jack Block Park',
+    area: 'West Seattle',
+    address: '2130 Harbor Ave SW, Seattle, WA 98126',
+    swimType: 'Beach (no lifeguard)',
+    water: 'Salt',
+    swim: 'Public beach access (post-cleanup) + a 45-ft observation tower with skyline views. Industrial setting; not a swim destination.',
+    cafe: 'Harbor Ave — Marination Ma Kai and coffee nearby.',
+    shade: 'Walking path; limited shade.',
+    tags: ['saltwater', 'views', 'no-lifeguard'],
+  },
+];
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = SPOTS;
+}

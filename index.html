@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Swim + Work Seattle</title>
+    <meta
+      name="description"
+      content="Seattle swim spots paired with cafes and shaded parks for remote work."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!-- Login / profile gate -->
+    <div id="login" class="login" hidden>
+      <div class="login__card">
+        <h1 class="login__title">Swim + Work <span>Seattle</span></h1>
+        <p class="login__sub">
+          Swimmable spots paired with cafes &amp; shaded parks for working remotely.
+          Pick a name to track your own check-offs, ratings, and comments.
+        </p>
+        <form id="login-form" class="login__form" autocomplete="off">
+          <label class="field">
+            <span class="field__label">Your name</span>
+            <input
+              id="login-name"
+              class="field__input"
+              type="text"
+              maxlength="60"
+              placeholder="e.g. Seth"
+              required
+            />
+          </label>
+          <button type="submit" class="btn btn--primary">Start exploring</button>
+        </form>
+        <p class="login__note">
+          Local profile only (no password yet) — it just keeps each person's notes
+          separate. Real sign-in is coming later.
+        </p>
+      </div>
+    </div>
+
+    <!-- Main app -->
+    <div id="app" class="app" hidden>
+      <header class="topbar">
+        <div class="topbar__brand">
+          <span class="topbar__logo" aria-hidden="true">🏊</span>
+          <div>
+            <h1 class="topbar__title">Swim + Work <span>Seattle</span></h1>
+            <p id="progress" class="topbar__progress">—</p>
+          </div>
+        </div>
+        <div class="topbar__right">
+          <span id="sync-pill" class="pill pill--local" title="Sync status">Local only</span>
+          <label class="switch" title="Show comments &amp; ratings from other people">
+            <input id="toggle-others" type="checkbox" />
+            <span>Others' comments</span>
+          </label>
+          <button id="theme-btn" class="btn btn--ghost" type="button" title="Toggle theme">
+            <span class="theme-btn__icon">◐</span>
+          </button>
+          <span class="chip" id="profile-chip">
+            <span id="profile-name">—</span>
+            <button id="switch-profile" class="chip__btn" type="button" title="Switch profile">
+              switch
+            </button>
+          </span>
+        </div>
+      </header>
+
+      <section class="filters">
+        <div class="filters__row">
+          <input
+            id="search"
+            class="filters__search"
+            type="search"
+            placeholder="Search spots, cafes, tags…"
+            aria-label="Search spots"
+          />
+          <label class="filters__check">
+            <input id="swimmable-only" type="checkbox" />
+            <span>Swimmable only</span>
+          </label>
+        </div>
+        <div id="area-tabs" class="area-tabs" role="tablist" aria-label="Filter by area"></div>
+      </section>
+
+      <main id="spots" class="spots" aria-live="polite"></main>
+
+      <p id="empty" class="empty" hidden>No spots match your filters.</p>
+
+      <footer class="footer">
+        <p>
+          Lifeguarded beaches (Lake Washington + Green Lake) run roughly
+          <strong>late June – early September</strong>. Puget Sound spots stay cold
+          (~46–56°F) year-round. Always check current conditions before swimming.
+        </p>
+      </footer>
+    </div>
+
+    <!-- Order matters: data + logic load before the app wiring. -->
+    <script src="data/spots.js"></script>
+    <script src="logic.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
