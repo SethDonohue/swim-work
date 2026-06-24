@@ -77,20 +77,43 @@ visibility, progress stats) and validates the `data/spots.js` dataset
 
 ## Deploy to Cloudflare Pages
 
-1. Push this repo to GitHub (already wired to `SethDonohue/swim-work`).
-2. In the Cloudflare dashboard → **Workers & Pages → Create → Pages → Connect to
-   Git**, pick this repo.
+Some steps run in your **terminal** (the `wrangler` CLI talks to Cloudflare's
+API for you) and some happen on the **Cloudflare website** (dashboard). Each
+step below is labeled.
+
+1. **[terminal]** Push this repo to GitHub (already wired to
+   `SethDonohue/swim-work`).
+2. **[website]** In the Cloudflare dashboard → **Workers & Pages → Create →
+   Pages → Connect to Git**, pick this repo.
    - **Build command:** _(none)_
    - **Build output directory:** `/`
-3. Create the D1 database and bind it:
+3. **[terminal]** Create the D1 database and load the schema. First authenticate
+   once (this opens a browser to log into Cloudflare):
    ```bash
-   npx wrangler d1 create swim-work          # copy the database_id
-   npx wrangler d1 execute swim-work --remote --file=./schema.sql
+   npx wrangler login
    ```
-   Then in the Pages project → **Settings → Functions → D1 database bindings**,
-   add binding **`DB`** → database **`swim-work`** (and keep `wrangler.toml` in
-   sync with the `database_id`).
-4. Redeploy. Done.
+   Then, from inside `~/code/swim-work`:
+   ```bash
+   npx wrangler d1 create swim-work          # provisions the DB; prints a database_id
+   npx wrangler d1 execute swim-work --remote --file=./schema.sql   # creates the table in PRODUCTION
+   ```
+   Paste the printed `database_id` into `wrangler.toml` →
+   `[[d1_databases]].database_id` (it's an identifier, not a secret — safe to
+   commit), then commit + push the change.
+4. **[website]** Bind the database to the Pages project: dashboard → your
+   `swim-work` Pages project → **Settings → Bindings** (Functions) → add a
+   **D1 database binding** named **`DB`** → database **`swim-work`**. This is what
+   makes `context.env.DB` exist for `functions/api/entries.js` in production.
+   - _Note:_ because `wrangler.toml` already declares the `DB` binding, a
+     Git-connected Pages project may pick it up automatically on the next deploy,
+     making this manual step unnecessary. The dashboard method always works as a
+     fallback.
+5. **[website]** Redeploy (Deployments → Retry/redeploy, or just push a commit).
+   Done — the app should now show the **Synced** badge instead of **Local only**.
+
+> **Local vs. remote:** the commands above set up the *production* database.
+> Local dev (`npm run dev`) uses a separate local database — seed it once with
+> `npm run db:init:local`.
 
 ---
 
