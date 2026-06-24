@@ -115,6 +115,32 @@ step below is labeled.
 > Local dev (`npm run dev`) uses a separate local database — seed it once with
 > `npm run db:init:local`.
 
+### Troubleshooting: build fails with "Missing entry-point to Worker script or to assets directory"
+
+This happens when the repo is connected as a **Worker** (the "Workers Builds"
+pipeline) instead of a **Pages** project. Its default deploy command is
+`npx wrangler deploy` (the Workers command), which ignores
+`pages_build_output_dir` and looks for a Worker entry point that doesn't exist —
+so it errors. Wrangler even warns *"you have run `wrangler deploy` on a Pages
+project, `wrangler pages deploy` should be used instead."*
+
+Fix (no code changes): in the project's **Settings → Build → Deploy command**,
+change it from `npx wrangler deploy` to:
+
+```bash
+npx wrangler pages deploy
+```
+
+`wrangler pages deploy` reads `pages_build_output_dir` (`.`) and the project
+`name` from `wrangler.toml`, uploads the static files, and wires the `functions/`
+API + the `DB` binding from `wrangler.toml`. If it complains about a missing
+project name, use `npx wrangler pages deploy --project-name=swim-work`.
+
+> The committed `wrangler.toml` must contain the real `database_id` (not the
+> placeholder) so the CI build binds `DB` to your D1 database. Also make sure the
+> production schema is loaded once: `npx wrangler d1 execute swim-work --remote
+> --file=./schema.sql`.
+
 ---
 
 ## TODO / roadmap
