@@ -19,6 +19,10 @@
 
 const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8' };
 
+// Identifies this app to Nominatim per their usage policy (a real UA is required).
+const GEOCODER_UA =
+  'swim-work/1.0 (Seattle swim+work map; https://swim-work.donohue-seth.workers.dev)';
+
 export function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
 }
@@ -112,8 +116,67 @@ async function deleteEntry(request, env) {
   return json({ ok: true });
 }
 
-async function handleApi(request, env) {
+/**
+ * Geocode a free-text place/address to coordinates via OpenStreetMap Nominatim,
+ * biased to the greater-Seattle area. Responses are cached for a day (Nominatim
+ * asks consumers to cache + rate-limit), so repeated lookups don't re-hit them.
+ */
+async function geocode(request, env, ctx) {
   const url = new URL(request.url);
+  const q = (url.searchParams.get('q') || '').trim();
+  if (!q) return json({ error: 'q query param is required' }, 400);
+
+  const cache = typeof caches !== 'undefined' ? caches.default : null;
+  const cacheKey = new Request('https://geocode.internal/?q=' + encodeURIComponent(q.toLowerCase()));
+  if (cache) {
+    const hit = await cache.match(cacheKey);
+    if (hit) return hit;
+  }
+
+  const upstream = new URL('https://nominatim.openstreetmap.org/search');
+  upstream.searchParams.set('q', q);
+  upstream.searchParams.set('format', 'jsonv2');
+  upstream.searchParams.set('limit', '1');
+  // Greater-Seattle viewbox (left,top,right,bottom) to bias results locally.
+  upstream.searchParams.set('viewbox', '-122.55,47.80,-122.18,47.40');
+  upstream.searchParams.set('bounded', '0');
+
+  let res;
+  try {
+    res = await fetch(upstream.toString(), {
+      headers: { 'User-Agent': GEOCODER_UA, Accept: 'application/json', 'Accept-Language': 'en' },
+    });
+  } catch (_) {
+    return json({ error: 'Geocoding service unavailable' }, 502);
+  }
+  if (!res.ok) return json({ error: `Geocoding failed (${res.status})` }, 502);
+
+  let data;
+  try {
+    data = await res.json();
+  } catch (_) {
+    return json({ error: 'Bad geocoding response' }, 502);
+  }
+
+  const top = Array.isArray(data) && data.length ? data[0] : null;
+  const result = top
+    ? { lat: Number(top.lat), lng: Number(top.lon), label: top.display_name || q }
+    : null;
+
+  const out = json({ result });
+  out.headers.set('cache-control', 'public, max-age=86400');
+  if (cache && ctx && ctx.waitUntil) ctx.waitUntil(cache.put(cacheKey, out.clone()));
+  return out;
+}
+
+async function handleApi(request, env, ctx) {
+  const url = new URL(request.url);
+
+  if (url.pathname === '/api/geocode') {
+    if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
+    return geocode(request, env, ctx);
+  }
+
   if (url.pathname !== '/api/entries') {
     return json({ error: 'Not found' }, 404);
   }
@@ -137,10 +200,10 @@ async function handleApi(request, env) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (url.pathname.startsWith('/api/')) {
-      return handleApi(request, env);
+      return handleApi(request, env, ctx);
     }
     // Everything else is a static asset (or a 404 from the assets handler).
     return env.ASSETS.fetch(request);

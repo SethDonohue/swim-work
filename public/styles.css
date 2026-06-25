@@ -290,6 +290,108 @@ input {
   color: var(--primary-ink);
 }
 
+/* ---------- Nearest-swim finder ---------- */
+.finder {
+  margin-bottom: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 0.9rem 1rem;
+}
+.finder__form {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.finder__input {
+  flex: 1 1 320px;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+}
+.finder__input:focus {
+  outline: 2px solid color-mix(in srgb, var(--primary) 55%, transparent);
+  border-color: var(--primary);
+}
+.finder__hint {
+  margin: 0.55rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.finder__status {
+  color: var(--primary);
+  font-weight: 600;
+}
+.finder__results {
+  margin-top: 0.85rem;
+  border-top: 1px dashed var(--border);
+  padding-top: 0.7rem;
+}
+.finder__label {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+}
+.recs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.rec {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 0.5rem 0.7rem;
+  flex-wrap: wrap;
+}
+.rec__left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.rec__rank {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--primary-ink);
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+.rec__main {
+  display: flex;
+  flex-direction: column;
+}
+.rec__name {
+  font-weight: 700;
+}
+.rec__meta {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+.rec__actions {
+  display: flex;
+  gap: 0.4rem;
+}
+.rec__btn {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+}
+
 /* ---------- View toggle (List / Map) ---------- */
 .viewtoggle {
   display: inline-flex;

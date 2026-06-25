@@ -100,6 +100,26 @@
         <div id="area-tabs" class="area-tabs" role="tablist" aria-label="Filter by area"></div>
       </section>
 
+      <section class="finder" aria-label="Find the nearest swim spot">
+        <form id="finder-form" class="finder__form" autocomplete="off">
+          <input
+            id="finder-input"
+            class="finder__input"
+            type="text"
+            placeholder="Enter a park, cafe, or address to find the nearest swim…"
+            aria-label="Location to search from"
+          />
+          <button type="submit" class="btn btn--primary">Find swim</button>
+          <button id="finder-geo" class="btn" type="button">📍 My location</button>
+          <button id="finder-clear" class="btn btn--ghost" type="button" hidden>Clear</button>
+        </form>
+        <p class="finder__hint">
+          <span id="finder-status" class="finder__status" aria-live="polite"></span>
+          <span class="finder__tip">Tip: in Map view you can also click anywhere to drop your start point.</span>
+        </p>
+        <div id="finder-results" class="finder__results" hidden></div>
+      </section>
+
       <main id="spots" class="spots" aria-live="polite"></main>
 
       <section id="map-view" class="map-view" hidden>

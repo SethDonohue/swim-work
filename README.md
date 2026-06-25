@@ -10,6 +10,10 @@ Each person signs in with a local profile and can:
 - ⭐ **Rate** each spot (0–5)
 - 📝 **Leave comments / notes** (wifi, outlets, shade, swim quality…)
 - 👀 **Toggle on other people's comments** to see what everyone else thinks
+- 🗺️ **Browse a map** (List/Map toggle) with markers color-coded by swim type
+- 🧭 **Find the nearest swim** from any park, cafe, or address — type a location,
+  use your current location, or click the map; it ranks swimmable spots by a blend
+  of distance and community rating
 
 Comments sync through a small **Cloudflare Worker + D1** backend (the Worker also
 serves the static front-end via Workers static assets). If the backend isn't
@@ -28,7 +32,7 @@ public/               # static front-end (served as Workers assets)
   app.js              #   browser wiring (rendering + cloud/local store)
   logic.js            #   pure, testable logic (shared with tests)
   data/spots.js       #   the curated list of spots
-src/index.mjs         # Cloudflare Worker: /api/entries (D1) + static-asset serving
+src/index.mjs         # Cloudflare Worker: /api/entries (D1) + /api/geocode + static assets
 schema.sql            # D1 table definition
 wrangler.toml         # Cloudflare config (Worker entry, assets, D1 binding)
 test/                 # node:test unit tests
@@ -143,6 +147,18 @@ website** (dashboard); each is labeled.
 
 ---
 
+## API routes
+
+The Worker (`src/index.mjs`) exposes:
+
+- `GET|PUT|DELETE /api/entries` — visited / rating / comment storage in D1.
+- `GET /api/geocode?q=<place>` — geocodes a place/address to `{ lat, lng, label }`
+  for the "nearest swim" finder. It proxies **OpenStreetMap Nominatim** (biased to
+  the Seattle area), caches each lookup for a day, and sends a descriptive
+  `User-Agent` per [Nominatim's usage policy](https://operations.osmfoundation.org/policies/nominatim/).
+  Map tiles + geocoding are © OpenStreetMap contributors. For heavier use, swap in
+  a dedicated geocoder (Mapbox, Google, etc.).
+
 ## TODO / roadmap
 
 - [ ] **Real authentication (Cloudflare Access).** Today "login" is just a local
@@ -152,9 +168,18 @@ website** (dashboard); each is labeled.
   identity from the verified Access JWT (`Cf-Access-Jwt-Assertion` /
   `cf-access-authenticated-user-email`) instead of trusting the client.
 - [ ] **See/track water quality per location.** Surface each beach's current
-  water-quality status (bacteria advisories / closures) — e.g. from King County's
-  Swim Beach Monitoring program and/or Seattle Parks beach closures — and let
-  users log their own observations (clarity, algae, temperature) over time.
+  water-quality status (bacteria advisories / closures) and let users log their own
+  observations (clarity, algae, temperature) over time. Confirmed public sources:
+  - **Freshwater (Lake Washington + Green Lake):** King County Swim Beach open data
+    (Socrata SODA API, JSON, no key) —
+    `https://data.kingcounty.gov/resource/mbzm-4r9y.json` (E. coli + temp + toxic
+    algae; weekly, ~mid-May→mid-Sep). Add a `kcBeach` name per spot to map to it.
+  - **Saltwater (Alki + West Seattle):** WA Dept. of Ecology BEACH program via the
+    Coastal Atlas ArcGIS REST layer —
+    `https://gis.ecology.wa.gov/serverext/rest/services/GIS/CoastalAtlas/MapServer/888/query?where=1=1&outFields=*&f=json`.
+  - **Federal fallback:** EPA/USGS Water Quality Portal (`waterqualitydata.us`).
+  - Plan: proxy + cache these behind a new `/api/water` Worker route (like
+    `/api/geocode`); Lake Union (no-swim) + tide-pool spots show "not monitored".
 - [ ] Per-spot photos.
 - [ ] "Hide visited" filter + sort options.
 - [ ] Export/import a profile's notes as JSON.
@@ -177,9 +202,11 @@ website** (dashboard); each is labeled.
    each beach.
 5. [ ] **Favorites & a "to-try" list.** Let users star spots into a personal
    shortlist that's distinct from "visited", with a quick filter for each.
-6. [ ] **Distance, sort, and directions.** With opt-in geolocation, sort spots by
-   proximity and show drive/bike/transit time; add sort-by-rating and
-   multi-tag filtering (e.g. "wifi-cafe" + "shaded").
+6. [~] **Distance, sort, and directions.** ✅ Done: the "nearest swim" finder takes
+   any park/cafe/address (geocoded), your geolocation, or a map click and ranks
+   swimmable spots by distance blended with community rating. Still to do: show
+   drive/bike/transit time, sort the main list by proximity, and multi-tag
+   filtering (e.g. "wifi-cafe" + "shaded").
 7. [ ] **Community aggregates.** Show an average rating + visit count per spot
    (across all users), a "popular this week" sort, and a small sparkline of
    recent activity — turning individual notes into shared signal.

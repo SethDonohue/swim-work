@@ -21,7 +21,14 @@
     profile: null,
     entries: [],
     mode: 'local', // 'cloud' | 'local'
-    prefs: { showOthers: false, area: 'All', query: '', swimmableOnly: false, view: 'list' },
+    prefs: {
+      showOthers: false,
+      area: 'All',
+      query: '',
+      swimmableOnly: false,
+      view: 'list',
+      origin: null, // { lat, lng, label } for the "nearest swim" finder
+    },
   };
 
   // Leaflet map handles (created lazily the first time the map view is shown).
@@ -372,6 +379,8 @@
     const filtered = SPOTS.filter((s) => Logic.spotMatchesFilters(s, state.prefs));
     renderProgress(filtered);
 
+    renderFinderResults();
+
     const mapView = state.prefs.view === 'map';
     $('#spots').hidden = mapView;
     $('#map-view').hidden = !mapView;
@@ -385,6 +394,105 @@
     const container = $('#spots');
     container.textContent = '';
     for (const spot of filtered) container.appendChild(renderCard(spot));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Nearest-swim finder (geocode / geolocation / map-click -> recommendations)
+  // ---------------------------------------------------------------------------
+  function formatDistance(km) {
+    const mi = km * 0.621371;
+    if (mi < 0.1) return '< 0.1 mi';
+    return `${mi.toFixed(1)} mi`;
+  }
+
+  async function geocodeQuery(q) {
+    try {
+      const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`, {
+        headers: { accept: 'application/json' },
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data && data.result ? data.result : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function setOrigin(origin) {
+    state.prefs.origin = origin;
+    savePrefs();
+    render();
+  }
+
+  function clearOrigin() {
+    state.prefs.origin = null;
+    savePrefs();
+    $('#finder-status').textContent = '';
+    render();
+  }
+
+  function renderFinderResults() {
+    const box = $('#finder-results');
+    const origin = state.prefs.origin;
+    $('#finder-clear').hidden = !origin;
+
+    if (!origin || !Logic.hasCoords(origin)) {
+      box.hidden = true;
+      box.textContent = '';
+      return;
+    }
+
+    const recs = Logic.recommendSwimSpots(SPOTS, origin, state.entries, { limit: 3 });
+    box.textContent = '';
+    box.appendChild(
+      el('p', { class: 'finder__label' }, [
+        document.createTextNode('Best swims near '),
+        el('b', { text: origin.label || 'your location' }),
+      ])
+    );
+
+    if (!recs.length) {
+      box.appendChild(el('p', { class: 'others__empty', text: 'No swimmable spots found.' }));
+      box.hidden = false;
+      return;
+    }
+
+    const list = el('ol', { class: 'recs' });
+    recs.forEach((r, i) => {
+      const ratingText = r.ratingCount
+        ? `★ ${r.avgRating.toFixed(1)} (${r.ratingCount})`
+        : 'no ratings yet';
+      list.appendChild(
+        el('li', { class: 'rec' }, [
+          el('div', { class: 'rec__left' }, [
+            el('span', { class: 'rec__rank', text: String(i + 1) }),
+            el('div', { class: 'rec__main' }, [
+              el('span', { class: 'rec__name', text: r.spot.name }),
+              el('span', {
+                class: 'rec__meta',
+                text: `${r.spot.area} · ${formatDistance(r.distanceKm)} · ${ratingText}`,
+              }),
+            ]),
+          ]),
+          el('div', { class: 'rec__actions' }, [
+            el('button', {
+              class: 'btn btn--ghost rec__btn',
+              type: 'button',
+              text: 'Details',
+              onclick: () => jumpToCard(r.spot.id),
+            }),
+            el('button', {
+              class: 'btn btn--ghost rec__btn',
+              type: 'button',
+              text: 'Map',
+              onclick: () => setView('map'),
+            }),
+          ]),
+        ])
+      );
+    });
+    box.appendChild(list);
+    box.hidden = false;
   }
 
   // ---------------------------------------------------------------------------
@@ -402,7 +510,25 @@
       attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map);
     markersLayer = L.layerGroup().addTo(map);
+    // Click anywhere on the map to drop a start point for the finder.
+    map.on('click', (e) => setOrigin({ lat: e.latlng.lat, lng: e.latlng.lng, label: 'Picked point' }));
     return map;
+  }
+
+  function buildOriginPopup() {
+    const origin = state.prefs.origin || {};
+    return el('div', { class: 'mappop' }, [
+      el('span', { class: 'mappop__area', text: 'Start point' }),
+      el('h3', { class: 'mappop__title', text: origin.label || 'Your location' }),
+      el('div', { class: 'mappop__actions' }, [
+        el('button', {
+          class: 'btn btn--ghost mappop__btn',
+          type: 'button',
+          text: 'Clear',
+          onclick: () => clearOrigin(),
+        }),
+      ]),
+    ]);
   }
 
   function buildPopup(spot) {
@@ -434,13 +560,21 @@
     $('#map-fallback').hidden = true;
     markersLayer.clearLayers();
 
+    const origin = state.prefs.origin;
+    const recs =
+      origin && Logic.hasCoords(origin)
+        ? Logic.recommendSwimSpots(SPOTS, origin, state.entries, { limit: 3 })
+        : [];
+    const recIds = new Set(recs.map((r) => r.spot.id));
+
     const points = [];
     for (const spot of filtered) {
       if (!Logic.hasCoords(spot)) continue;
       const mine = Logic.myEntry(state.entries, spot.id, state.profile.id);
       const visited = !!(mine && mine.visited);
+      const isRec = recIds.has(spot.id);
       const marker = L.circleMarker([spot.lat, spot.lng], {
-        radius: 9,
+        radius: isRec ? 12 : 9,
         weight: visited ? 3 : 2,
         color: visited ? '#f4b740' : '#ffffff',
         fillColor: Logic.swimTypeColor(spot.swimType),
@@ -449,6 +583,31 @@
       marker.bindPopup(buildPopup(spot));
       markersLayer.addLayer(marker);
       points.push([spot.lat, spot.lng]);
+    }
+
+    // Draw the finder's start point + a line to the top recommendation.
+    if (origin && Logic.hasCoords(origin)) {
+      const o = [origin.lat, origin.lng];
+      if (recs.length) {
+        markersLayer.addLayer(
+          L.polyline([o, [recs[0].spot.lat, recs[0].spot.lng]], {
+            color: '#0d7fb8',
+            weight: 3,
+            dashArray: '6 6',
+            opacity: 0.8,
+          })
+        );
+      }
+      markersLayer.addLayer(
+        L.circleMarker(o, {
+          radius: 8,
+          weight: 3,
+          color: '#ffffff',
+          fillColor: '#e0467c',
+          fillOpacity: 1,
+        }).bindPopup(buildOriginPopup())
+      );
+      points.push(o);
     }
 
     if (points.length) {
@@ -597,6 +756,42 @@
 
     $('#view-list').addEventListener('click', () => setView('list'));
     $('#view-map').addEventListener('click', () => setView('map'));
+
+    $('#finder-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const q = $('#finder-input').value.trim();
+      if (!q) return;
+      const status = $('#finder-status');
+      status.textContent = 'Searching…';
+      const result = await geocodeQuery(q);
+      if (result && Logic.hasCoords(result)) {
+        status.textContent = '';
+        setOrigin({ lat: result.lat, lng: result.lng, label: result.label });
+      } else {
+        status.textContent = "Couldn't find that location — try 'My location' or click the map.";
+      }
+    });
+
+    $('#finder-geo').addEventListener('click', () => {
+      const status = $('#finder-status');
+      if (!navigator.geolocation) {
+        status.textContent = 'Geolocation is not available in this browser.';
+        return;
+      }
+      status.textContent = 'Locating…';
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          status.textContent = '';
+          setOrigin({ lat: pos.coords.latitude, lng: pos.coords.longitude, label: 'Your location' });
+        },
+        () => {
+          status.textContent = 'Could not get your location (permission denied?).';
+        },
+        { enableHighAccuracy: false, timeout: 8000 }
+      );
+    });
+
+    $('#finder-clear').addEventListener('click', clearOrigin);
 
     $('#theme-btn').addEventListener('click', () => {
       const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';

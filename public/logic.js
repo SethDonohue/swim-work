@@ -40,6 +40,63 @@ const Logic = {
     );
   },
 
+  /** Great-circle distance in km between two {lat,lng} points (Haversine). */
+  haversineKm(a, b) {
+    if (!Logic.hasCoords(a) || !Logic.hasCoords(b)) return Infinity;
+    const toRad = (deg) => (deg * Math.PI) / 180;
+    const R = 6371; // earth radius, km
+    const dLat = toRad(b.lat - a.lat);
+    const dLng = toRad(b.lng - a.lng);
+    const lat1 = toRad(a.lat);
+    const lat2 = toRad(b.lat);
+    const h =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+  },
+
+  /** Average of the non-zero ratings for a spot across all authors. */
+  averageRating(entries, spotId) {
+    const vals = (entries || [])
+      .filter((e) => e.spotId === spotId)
+      .map((e) => Logic.coerceRating(e.rating))
+      .filter((r) => r > 0);
+    if (!vals.length) return { avg: 0, count: 0 };
+    const sum = vals.reduce((a, b) => a + b, 0);
+    return { avg: sum / vals.length, count: vals.length };
+  },
+
+  /**
+   * Weighting for the "best nearby swim" score. Distance dominates (it's a
+   * *nearby* recommendation) but community rating breaks near-ties and lifts
+   * well-loved spots. Unrated spots get a neutral prior so they aren't buried.
+   */
+  RECOMMEND_WEIGHTS: { distance: 0.7, rating: 0.3, neutralRating: 0.5 },
+
+  /**
+   * Rank swimmable spots near an origin {lat,lng}, blending closeness with
+   * community rating. Returns up to opts.limit items:
+   *   { spot, distanceKm, avgRating, ratingCount, score }  (best first)
+   */
+  recommendSwimSpots(spots, origin, entries, opts) {
+    const options = opts || {};
+    const limit = options.limit || 3;
+    if (!Logic.hasCoords(origin)) return [];
+    const w = Logic.RECOMMEND_WEIGHTS;
+    const scored = (spots || [])
+      .filter((s) => Logic.isSwimmable(s) && Logic.hasCoords(s))
+      .map((spot) => {
+        const distanceKm = Logic.haversineKm(origin, spot);
+        const { avg, count } = Logic.averageRating(entries, spot.id);
+        const distanceScore = 1 / (1 + distanceKm); // 1 at 0km, falls off with distance
+        const ratingNorm = count > 0 ? avg / 5 : w.neutralRating;
+        const score = w.distance * distanceScore + w.rating * ratingNorm;
+        return { spot, distanceKm, avgRating: avg, ratingCount: count, score };
+      });
+    scored.sort((a, b) => b.score - a.score || a.distanceKm - b.distanceKm);
+    return scored.slice(0, limit);
+  },
+
   /** Google Maps search link from the spot's name + address. */
   buildMapUrl(spot) {
     const query = encodeURIComponent(`${spot.name} ${spot.address || ''}`.trim());

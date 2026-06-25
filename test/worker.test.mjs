@@ -131,6 +131,55 @@ test('missing DB binding returns 500', async () => {
   assert.match((await res.json()).error, /DB/);
 });
 
+test('GET /api/geocode proxies Nominatim and shapes the result', async () => {
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify([{ lat: '47.61', lon: '-122.33', display_name: 'Test Park, Seattle' }]), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  try {
+    const res = await worker.fetch(req('/api/geocode?q=test%20park'), { ASSETS: assets }, { waitUntil() {} });
+    assert.equal(res.status, 200);
+    assert.deepEqual((await res.json()).result, {
+      lat: 47.61,
+      lng: -122.33,
+      label: 'Test Park, Seattle',
+    });
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+});
+
+test('GET /api/geocode returns null result when there is no match', async () => {
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } });
+  try {
+    const res = await worker.fetch(req('/api/geocode?q=zzz'), { ASSETS: assets }, { waitUntil() {} });
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).result, null);
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+});
+
+test('GET /api/geocode requires a q param', async () => {
+  const res = await worker.fetch(req('/api/geocode'), { ASSETS: assets }, { waitUntil() {} });
+  assert.equal(res.status, 400);
+});
+
+test('GET /api/geocode surfaces upstream failure as 502', async () => {
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response('nope', { status: 500 });
+  try {
+    const res = await worker.fetch(req('/api/geocode?q=test'), { ASSETS: assets }, { waitUntil() {} });
+    assert.equal(res.status, 502);
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+});
+
 test('clampRating + rowToEntry helpers behave', () => {
   assert.equal(clampRating(10), 5);
   assert.equal(clampRating(-1), 0);

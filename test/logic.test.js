@@ -35,6 +35,53 @@ test('hasCoords only accepts finite numeric lat/lng', () => {
   assert.equal(Logic.hasCoords(null), false);
 });
 
+test('haversineKm: 0 for same point, sane for close points, Infinity for bad input', () => {
+  assert.equal(Logic.haversineKm({ lat: 47.6, lng: -122.3 }, { lat: 47.6, lng: -122.3 }), 0);
+  const d = Logic.haversineKm({ lat: 47.61, lng: -122.33 }, { lat: 47.62, lng: -122.34 });
+  assert.ok(d > 0 && d < 3, `expected a small distance, got ${d}`);
+  assert.equal(Logic.haversineKm({ lat: 47.6, lng: -122.3 }, { lat: 'x' }), Infinity);
+});
+
+test('averageRating averages only non-zero ratings for the spot', () => {
+  const entries = [
+    { spotId: 'a', authorId: 'x', rating: 4 },
+    { spotId: 'a', authorId: 'y', rating: 2 },
+    { spotId: 'a', authorId: 'z', rating: 0 },
+    { spotId: 'b', authorId: 'x', rating: 5 },
+  ];
+  assert.deepEqual(Logic.averageRating(entries, 'a'), { avg: 3, count: 2 });
+  assert.deepEqual(Logic.averageRating(entries, 'none'), { avg: 0, count: 0 });
+});
+
+test('recommendSwimSpots ranks nearest swimmable spots and excludes non-swimmable', () => {
+  const spots = [
+    { id: 'near-pool', swimType: 'Heated pool', lat: 47.601, lng: -122.301 },
+    { id: 'far-life', swimType: 'Lifeguarded beach', lat: 47.7, lng: -122.4 },
+    { id: 'near-noswim', swimType: 'No swimming', lat: 47.6005, lng: -122.3005 },
+  ];
+  const recs = Logic.recommendSwimSpots(spots, { lat: 47.6, lng: -122.3 }, [], { limit: 3 });
+  assert.ok(!recs.find((r) => r.spot.id === 'near-noswim'), 'no-swimming spot excluded');
+  assert.equal(recs[0].spot.id, 'near-pool', 'nearest swimmable first');
+  assert.ok(recs[0].distanceKm < recs[1].distanceKm);
+});
+
+test('recommendSwimSpots breaks near-ties with the higher-rated spot', () => {
+  const spots = [
+    { id: 'plain', swimType: 'Saltwater beach', lat: 47.602, lng: -122.3 },
+    { id: 'loved', swimType: 'Saltwater beach', lat: 47.602, lng: -122.3 },
+  ];
+  const entries = [
+    { spotId: 'loved', authorId: 'a', rating: 5 },
+    { spotId: 'loved', authorId: 'b', rating: 5 },
+  ];
+  const recs = Logic.recommendSwimSpots(spots, { lat: 47.6, lng: -122.3 }, entries, { limit: 2 });
+  assert.equal(recs[0].spot.id, 'loved');
+});
+
+test('recommendSwimSpots returns [] without a valid origin', () => {
+  assert.deepEqual(Logic.recommendSwimSpots([{ id: 'a', swimType: 'Heated pool', lat: 47.6, lng: -122.3 }], null, []), []);
+});
+
 test('coerceRating clamps to integer 0..5', () => {
   assert.equal(Logic.coerceRating(3), 3);
   assert.equal(Logic.coerceRating('4'), 4);
