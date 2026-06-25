@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const Logic = require('../logic.js');
+const Logic = require('../public/logic.js');
 
 test('isSwimmable distinguishes water access from view-only spots', () => {
   assert.equal(Logic.isSwimmable({ swimType: 'Lifeguarded beach' }), true);

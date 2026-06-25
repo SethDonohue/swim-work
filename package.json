@@ -5,7 +5,8 @@
   "description": "Seattle swim spots paired with cafes & shaded parks for remote work.",
   "type": "commonjs",
   "scripts": {
-    "dev": "wrangler pages dev .",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
     "test": "node --test",
     "db:create": "wrangler d1 create swim-work",
     "db:init:local": "wrangler d1 execute swim-work --local --file=./schema.sql",

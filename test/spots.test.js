@@ -3,8 +3,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const SPOTS = require('../data/spots.js');
-const Logic = require('../logic.js');
+const SPOTS = require('../public/data/spots.js');
+const Logic = require('../public/logic.js');
 
 test('spots dataset is valid (unique kebab ids, required fields, valid swimType)', () => {
   const errors = Logic.validateSpots(SPOTS);

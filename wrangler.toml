@@ -1,12 +1,18 @@
 name = "swim-work"
+main = "src/index.mjs"
 compatibility_date = "2026-06-24"
 
-# Serve the static files in the repo root, plus the /functions Pages Functions.
-pages_build_output_dir = "."
+# Static front-end lives in ./public (a dedicated dir so .git, source, and
+# config are never served). The Worker (src/index.mjs) handles /api/* and falls
+# back to these assets otherwise.
+[assets]
+directory = "public"
+binding = "ASSETS"
+run_worker_first = ["/api/*"]
 
-# Cloudflare D1 database binding used by functions/api/entries.js.
+# Cloudflare D1 database binding used by the Worker.
 # Create it once with:  npx wrangler d1 create swim-work
-# then paste the returned database_id below (and into the Pages project settings).
+# then paste the returned database_id below.
 [[d1_databases]]
 binding = "DB"
 database_name = "swim-work"
