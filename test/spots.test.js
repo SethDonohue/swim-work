@@ -27,3 +27,11 @@ test('every spot produces a usable map URL', () => {
     assert.match(Logic.buildMapUrl(spot), /^https:\/\/www\.google\.com\/maps\/search\//);
   }
 });
+
+test('every spot has valid coordinates inside the Seattle area', () => {
+  for (const spot of SPOTS) {
+    assert.ok(Logic.hasCoords(spot), `${spot.id} is missing numeric lat/lng`);
+    assert.ok(spot.lat > 47.3 && spot.lat < 47.9, `${spot.id} lat ${spot.lat} out of range`);
+    assert.ok(spot.lng > -122.6 && spot.lng < -122.1, `${spot.id} lng ${spot.lng} out of range`);
+  }
+});

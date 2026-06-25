@@ -161,9 +161,11 @@ website** (dashboard); each is labeled.
 
 ### Next 10 feature ideas
 
-1. [ ] **Interactive map view.** Add `lat`/`lng` to each spot and plot them on a
-   map (Leaflet + OpenStreetMap, no API key) with markers color-coded by swim
-   type. Click a marker to scroll to its card; toggle between list and map views.
+1. [x] **Interactive map view.** ✅ Each spot has `lat`/`lng` and is plotted on a
+   Leaflet + OpenStreetMap map (no API key) with markers color-coded by swim
+   type (visited spots get a gold ring). A List/Map toggle switches views, a
+   legend explains the colors, and a marker popup's "View details" button jumps
+   to that spot's card.
 2. [ ] **Live conditions per spot.** Pull current/forecast weather, air temp, UV
    index, and (where available) water temperature, plus today's sunrise/sunset,
    so you can decide *when* to go — not just *where*.

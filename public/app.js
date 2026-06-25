@@ -21,8 +21,12 @@
     profile: null,
     entries: [],
     mode: 'local', // 'cloud' | 'local'
-    prefs: { showOthers: false, area: 'All', query: '', swimmableOnly: false },
+    prefs: { showOthers: false, area: 'All', query: '', swimmableOnly: false, view: 'list' },
   };
+
+  // Leaflet map handles (created lazily the first time the map view is shown).
+  let map = null;
+  let markersLayer = null;
 
   // ---------------------------------------------------------------------------
   // Tiny DOM helpers (textContent-first to avoid XSS from user comments).
@@ -271,7 +275,10 @@
     const mine = Logic.myEntry(state.entries, spot.id, state.profile.id);
     const visited = !!(mine && mine.visited);
 
-    const card = el('article', { class: 'card' + (visited ? ' is-visited' : '') });
+    const card = el('article', {
+      class: 'card' + (visited ? ' is-visited' : ''),
+      id: 'card-' + spot.id,
+    });
 
     card.appendChild(
       el('div', { class: 'card__head' }, [
@@ -365,11 +372,139 @@
     const filtered = SPOTS.filter((s) => Logic.spotMatchesFilters(s, state.prefs));
     renderProgress(filtered);
 
+    const mapView = state.prefs.view === 'map';
+    $('#spots').hidden = mapView;
+    $('#map-view').hidden = !mapView;
+    $('#empty').hidden = filtered.length !== 0;
+
+    if (mapView) {
+      renderMap(filtered);
+      return;
+    }
+
     const container = $('#spots');
     container.textContent = '';
     for (const spot of filtered) container.appendChild(renderCard(spot));
+  }
 
-    $('#empty').hidden = filtered.length !== 0;
+  // ---------------------------------------------------------------------------
+  // Map view (Leaflet + OpenStreetMap, no API key)
+  // ---------------------------------------------------------------------------
+  function ensureMap() {
+    if (map) return map;
+    if (typeof window.L === 'undefined') {
+      $('#map-fallback').hidden = false;
+      return null;
+    }
+    map = L.map('map', { scrollWheelZoom: true }).setView([47.62, -122.33], 11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(map);
+    markersLayer = L.layerGroup().addTo(map);
+    return map;
+  }
+
+  function buildPopup(spot) {
+    return el('div', { class: 'mappop' }, [
+      el('span', { class: 'mappop__area', text: spot.area }),
+      el('h3', { class: 'mappop__title', text: spot.name }),
+      el('span', { class: badgeClassForSwim(spot.swimType), text: spot.swimType }),
+      el('p', { class: 'mappop__swim', text: spot.swim }),
+      el('div', { class: 'mappop__actions' }, [
+        el('button', {
+          class: 'btn btn--primary mappop__btn',
+          type: 'button',
+          text: 'View details',
+          onclick: () => jumpToCard(spot.id),
+        }),
+        el('a', {
+          class: 'card__map',
+          href: Logic.buildMapUrl(spot),
+          target: '_blank',
+          rel: 'noopener',
+          text: '📍 Maps',
+        }),
+      ]),
+    ]);
+  }
+
+  function renderMap(filtered) {
+    if (!ensureMap()) return;
+    $('#map-fallback').hidden = true;
+    markersLayer.clearLayers();
+
+    const points = [];
+    for (const spot of filtered) {
+      if (!Logic.hasCoords(spot)) continue;
+      const mine = Logic.myEntry(state.entries, spot.id, state.profile.id);
+      const visited = !!(mine && mine.visited);
+      const marker = L.circleMarker([spot.lat, spot.lng], {
+        radius: 9,
+        weight: visited ? 3 : 2,
+        color: visited ? '#f4b740' : '#ffffff',
+        fillColor: Logic.swimTypeColor(spot.swimType),
+        fillOpacity: 0.95,
+      });
+      marker.bindPopup(buildPopup(spot));
+      markersLayer.addLayer(marker);
+      points.push([spot.lat, spot.lng]);
+    }
+
+    if (points.length) {
+      map.fitBounds(points, { padding: [34, 34], maxZoom: 14 });
+    }
+    // The container may have just been un-hidden, so its size needs recomputing.
+    setTimeout(() => map.invalidateSize(), 0);
+
+    renderLegend();
+  }
+
+  function renderLegend() {
+    const legend = $('#map-legend');
+    legend.textContent = '';
+    const types = [
+      'Lifeguarded beach',
+      'Heated pool',
+      'Saltwater beach',
+      'Beach (no lifeguard)',
+      'Tide pools',
+      'No swimming',
+    ];
+    for (const t of types) {
+      legend.appendChild(
+        el('span', { class: 'legend__item' }, [
+          el('span', { class: 'legend__dot', style: `background:${Logic.swimTypeColor(t)}` }),
+          el('span', { text: t }),
+        ])
+      );
+    }
+  }
+
+  function jumpToCard(spotId) {
+    setView('list');
+    const card = document.getElementById('card-' + spotId);
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.add('is-flash');
+    setTimeout(() => card.classList.remove('is-flash'), 1700);
+  }
+
+  function syncViewToggle() {
+    const mapView = state.prefs.view === 'map';
+    const listBtn = $('#view-list');
+    const mapBtn = $('#view-map');
+    listBtn.classList.toggle('is-active', !mapView);
+    mapBtn.classList.toggle('is-active', mapView);
+    listBtn.setAttribute('aria-pressed', String(!mapView));
+    mapBtn.setAttribute('aria-pressed', String(mapView));
+  }
+
+  function setView(view) {
+    state.prefs.view = view === 'map' ? 'map' : 'list';
+    savePrefs();
+    syncViewToggle();
+    render();
   }
 
   // ---------------------------------------------------------------------------
@@ -460,6 +595,9 @@
       render();
     });
 
+    $('#view-list').addEventListener('click', () => setView('list'));
+    $('#view-map').addEventListener('click', () => setView('map'));
+
     $('#theme-btn').addEventListener('click', () => {
       const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
       localStorage.setItem(THEME_KEY, next);
@@ -481,6 +619,7 @@
     $('#search').value = state.prefs.query || '';
     $('#swimmable-only').checked = !!state.prefs.swimmableOnly;
     $('#toggle-others').checked = !!state.prefs.showOthers;
+    syncViewToggle();
 
     if (state.profile && state.profile.id) {
       startSession(state.profile);

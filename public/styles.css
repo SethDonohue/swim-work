@@ -290,6 +290,108 @@ input {
   color: var(--primary-ink);
 }
 
+/* ---------- View toggle (List / Map) ---------- */
+.viewtoggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.viewtoggle__btn {
+  border: none;
+  background: var(--surface);
+  color: var(--text-soft);
+  padding: 0.45rem 0.95rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.viewtoggle__btn + .viewtoggle__btn {
+  border-left: 1px solid var(--border);
+}
+.viewtoggle__btn.is-active {
+  background: var(--primary);
+  color: var(--primary-ink);
+}
+
+/* ---------- Map view ---------- */
+.map-view {
+  margin-bottom: 1.25rem;
+}
+.map {
+  height: min(70vh, 620px);
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.map-fallback {
+  text-align: center;
+  color: var(--text-soft);
+  padding: 2rem;
+}
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+.legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.legend__dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  flex: none;
+}
+
+/* Leaflet popup theming + jump-from-map content */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--surface);
+  color: var(--text);
+}
+.leaflet-popup-content {
+  margin: 0.7rem 0.85rem;
+}
+.mappop {
+  display: grid;
+  gap: 0.4rem;
+  max-width: 220px;
+}
+.mappop__area {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+}
+.mappop__title {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+.mappop__swim {
+  margin: 0;
+  font-size: 0.82rem;
+}
+.mappop__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.mappop__btn {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+}
+
 /* ---------- Spot cards ---------- */
 .spots {
   display: grid;
@@ -308,6 +410,18 @@ input {
 }
 .card.is-visited {
   border-color: var(--accent);
+}
+.card.is-flash {
+  animation: cardflash 1.6s ease;
+}
+@keyframes cardflash {
+  0%,
+  100% {
+    box-shadow: var(--shadow);
+  }
+  18% {
+    box-shadow: 0 0 0 3px var(--primary), var(--shadow);
+  }
 }
 .card__head {
   display: flex;

@@ -20,6 +20,21 @@ test('buildMapUrl encodes name + address', () => {
   assert.match(url, /Alki%20Beach/);
 });
 
+test('swimTypeColor returns a hex color per type with a fallback', () => {
+  assert.equal(Logic.swimTypeColor('Lifeguarded beach'), '#1f9d55');
+  assert.equal(Logic.swimTypeColor('Heated pool'), '#0d7fb8');
+  assert.match(Logic.swimTypeColor('Tide pools'), /^#[0-9a-f]{6}$/i);
+  assert.match(Logic.swimTypeColor('something unknown'), /^#[0-9a-f]{6}$/i);
+});
+
+test('hasCoords only accepts finite numeric lat/lng', () => {
+  assert.equal(Logic.hasCoords({ lat: 47.6, lng: -122.3 }), true);
+  assert.equal(Logic.hasCoords({ lat: '47.6', lng: -122.3 }), false);
+  assert.equal(Logic.hasCoords({ lat: NaN, lng: -122.3 }), false);
+  assert.equal(Logic.hasCoords({}), false);
+  assert.equal(Logic.hasCoords(null), false);
+});
+
 test('coerceRating clamps to integer 0..5', () => {
   assert.equal(Logic.coerceRating(3), 3);
   assert.equal(Logic.coerceRating('4'), 4);

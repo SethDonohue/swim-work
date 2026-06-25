@@ -15,6 +15,31 @@ const Logic = {
     return Logic.SWIMMABLE_TYPES.indexOf(spot.swimType) !== -1;
   },
 
+  /** Marker / swatch color per swim type (kept here so the map + tests agree). */
+  SWIM_TYPE_COLORS: {
+    'Lifeguarded beach': '#1f9d55',
+    'Heated pool': '#0d7fb8',
+    'Saltwater beach': '#b8860d',
+    'Beach (no lifeguard)': '#b8860d',
+    'Tide pools': '#7a5cc0',
+    'No swimming': '#8aa0b3',
+  },
+
+  swimTypeColor(swimType) {
+    return Logic.SWIM_TYPE_COLORS[swimType] || '#8aa0b3';
+  },
+
+  /** True when a spot has finite numeric coordinates we can map. */
+  hasCoords(spot) {
+    return (
+      !!spot &&
+      typeof spot.lat === 'number' &&
+      typeof spot.lng === 'number' &&
+      Number.isFinite(spot.lat) &&
+      Number.isFinite(spot.lng)
+    );
+  },
+
   /** Google Maps search link from the spot's name + address. */
   buildMapUrl(spot) {
     const query = encodeURIComponent(`${spot.name} ${spot.address || ''}`.trim());
@@ -160,6 +185,13 @@ const Logic = {
       }
       if (spot.swimType && validSwimTypes.indexOf(spot.swimType) === -1) {
         errors.push(`${label}: invalid swimType "${spot.swimType}"`);
+      }
+      if (!Logic.hasCoords(spot)) {
+        errors.push(`${label}: missing or invalid lat/lng`);
+      } else {
+        // Sanity-check the marker sits inside the greater-Seattle bounding box.
+        if (spot.lat < 47.3 || spot.lat > 47.9) errors.push(`${label}: lat out of Seattle range`);
+        if (spot.lng < -122.6 || spot.lng > -122.1) errors.push(`${label}: lng out of Seattle range`);
       }
       if (spot.tags && !Array.isArray(spot.tags)) {
         errors.push(`${label}: tags must be an array`);

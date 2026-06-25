@@ -9,6 +9,12 @@
       name="description"
       content="Seattle swim spots paired with cafes and shaded parks for remote work."
     />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -82,11 +88,27 @@
             <input id="swimmable-only" type="checkbox" />
             <span>Swimmable only</span>
           </label>
+          <div class="viewtoggle" role="group" aria-label="View mode">
+            <button id="view-list" class="viewtoggle__btn is-active" type="button" aria-pressed="true">
+              List
+            </button>
+            <button id="view-map" class="viewtoggle__btn" type="button" aria-pressed="false">
+              Map
+            </button>
+          </div>
         </div>
         <div id="area-tabs" class="area-tabs" role="tablist" aria-label="Filter by area"></div>
       </section>
 
       <main id="spots" class="spots" aria-live="polite"></main>
+
+      <section id="map-view" class="map-view" hidden>
+        <div id="map" class="map"></div>
+        <p id="map-fallback" class="map-fallback" hidden>
+          Map couldn't load — check your connection and try again.
+        </p>
+        <div id="map-legend" class="map-legend" aria-hidden="true"></div>
+      </section>
 
       <p id="empty" class="empty" hidden>No spots match your filters.</p>
 
@@ -99,7 +121,12 @@
       </footer>
     </div>
 
-    <!-- Order matters: data + logic load before the app wiring. -->
+    <!-- Order matters: Leaflet + data + logic load before the app wiring. -->
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
     <script src="data/spots.js"></script>
     <script src="logic.js"></script>
     <script src="app.js"></script>
