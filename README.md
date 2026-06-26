@@ -14,6 +14,9 @@ Each person signs in with a local profile and can:
 - 🧭 **Find the nearest swim** from any park, cafe, or address — type a location,
   use your current location, or click the map; it ranks swimmable spots by a blend
   of distance and community rating
+- 💧 **See live freshwater quality** — monitored Lake Washington + Green Lake
+  beaches show a color-coded bacteria advisory, water temp, and sample date from
+  King County; saltwater/unmonitored spots are clearly labeled "Not monitored"
 
 Comments sync through a small **Cloudflare Worker + D1** backend (the Worker also
 serves the static front-end via Workers static assets). If the backend isn't
@@ -32,7 +35,7 @@ public/               # static front-end (served as Workers assets)
   app.js              #   browser wiring (rendering + cloud/local store)
   logic.js            #   pure, testable logic (shared with tests)
   data/spots.js       #   the curated list of spots
-src/index.mjs         # Cloudflare Worker: /api/entries (D1) + /api/geocode + static assets
+src/index.mjs         # Cloudflare Worker: /api/entries (D1) + /api/geocode + /api/water + static assets
 schema.sql            # D1 table definition
 wrangler.toml         # Cloudflare config (Worker entry, assets, D1 binding)
 test/                 # node:test unit tests
@@ -158,6 +161,15 @@ The Worker (`src/index.mjs`) exposes:
   `User-Agent` per [Nominatim's usage policy](https://operations.osmfoundation.org/policies/nominatim/).
   Map tiles + geocoding are © OpenStreetMap contributors. For heavier use, swap in
   a dedicated geocoder (Mapbox, Google, etc.).
+- `GET /api/water` — latest freshwater quality per beach:
+  `{ source, updated, beaches: { "<beach>": { date, geomean30d, hightoday, nsampleshigh30d, watertempf } } }`.
+  It proxies the [King County Swim Beach Monitoring](https://green2.kingcounty.gov/swimbeach/)
+  Socrata dataset (`mbzm-4r9y`, no key), reduces to the newest sample per beach,
+  and caches the result for 6h. The client maps each spot's `kcBeach` to this data
+  and derives the advisory (`Logic.waterStatus`): a sample flagged high today →
+  **High bacteria**; a 30-day E. coli geomean over **126 MPN/100mL** → **Caution**;
+  otherwise **Good**. It's an advisory, not an official closure — always check the
+  posted status before swimming.
 
 ## TODO / roadmap
 
@@ -167,19 +179,20 @@ The Worker (`src/index.mjs`) exposes:
   **Cloudflare Access** (Google / one-time-PIN email), and derive the author
   identity from the verified Access JWT (`Cf-Access-Jwt-Assertion` /
   `cf-access-authenticated-user-email`) instead of trusting the client.
-- [ ] **See/track water quality per location.** Surface each beach's current
-  water-quality status (bacteria advisories / closures) and let users log their own
-  observations (clarity, algae, temperature) over time. Confirmed public sources:
-  - **Freshwater (Lake Washington + Green Lake):** King County Swim Beach open data
-    (Socrata SODA API, JSON, no key) —
-    `https://data.kingcounty.gov/resource/mbzm-4r9y.json` (E. coli + temp + toxic
-    algae; weekly, ~mid-May→mid-Sep). Add a `kcBeach` name per spot to map to it.
-  - **Saltwater (Alki + West Seattle):** WA Dept. of Ecology BEACH program via the
-    Coastal Atlas ArcGIS REST layer —
-    `https://gis.ecology.wa.gov/serverext/rest/services/GIS/CoastalAtlas/MapServer/888/query?where=1=1&outFields=*&f=json`.
-  - **Federal fallback:** EPA/USGS Water Quality Portal (`waterqualitydata.us`).
-  - Plan: proxy + cache these behind a new `/api/water` Worker route (like
-    `/api/geocode`); Lake Union (no-swim) + tide-pool spots show "not monitored".
+- [~] **See/track water quality per location.**
+  - [x] **Freshwater (Lake Washington + Green Lake) — done.** Each monitored
+    beach has a `kcBeach` name mapping it to King County Swim Beach open data
+    (Socrata `mbzm-4r9y.json`, JSON, no key; E. coli geomean + temp; weekly,
+    ~mid-May→mid-Sep). The Worker proxies + caches it at `/api/water` and the
+    card/map chips show a color-coded advisory + water temp + sample date.
+    Swimmable saltwater + unmonitored spots render a muted "Not monitored" chip.
+  - [ ] **Saltwater (Alki + West Seattle).** WA Dept. of Ecology's BEACH program
+    Coastal Atlas ArcGIS layer (`gis.ecology.wa.gov/.../MapServer/888`) currently
+    **403s** programmatic access (Azure gateway), so there's no live saltwater feed
+    yet. Options: revisit with an Ecology-approved endpoint/token, or fall back to
+    the EPA/USGS Water Quality Portal (`waterqualitydata.us`).
+  - [ ] **User-logged observations.** Let users record their own clarity / algae /
+    temperature notes per visit over time.
 - [ ] Per-spot photos.
 - [ ] "Hide visited" filter + sort options.
 - [ ] Export/import a profile's notes as JSON.

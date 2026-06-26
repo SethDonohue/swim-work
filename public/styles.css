@@ -584,6 +584,16 @@ input {
 .badge--water {
   color: var(--text-soft);
 }
+/* Live freshwater quality chip — colors come from an inline style per status. */
+.badge--waterq {
+  white-space: nowrap;
+}
+/* Saltwater / unmonitored spots: muted, dashed "not monitored" chip. */
+.badge--waterq-na {
+  border-style: dashed;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
 
 .detail {
   display: grid;
@@ -760,6 +770,13 @@ input {
   border-top: 1px solid var(--border);
   font-size: 0.8rem;
   color: var(--text-soft);
+}
+.footer__src {
+  font-size: 0.74rem;
+  opacity: 0.85;
+}
+.footer__src a {
+  color: inherit;
 }
 [hidden] {
   display: none !important;

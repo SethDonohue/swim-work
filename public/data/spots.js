@@ -10,6 +10,11 @@
  *
  * lat/lng are approximate (good enough to drop a map marker at the spot).
  *
+ * kcBeach (optional) maps a spot to its beach name in the King County Swim
+ * Beach Monitoring dataset so the app can show live freshwater quality.
+ * Only set it on monitored freshwater beaches; saltwater / unmonitored spots
+ * omit it and render a "Not monitored" chip instead.
+ *
  * Notes on the season: Seattle Parks runs FREE lifeguarded beaches roughly
  * late June – early September (2026: ~Jun 27 – Sep 7). Puget Sound spots
  * (Alki, etc.) stay cold year-round (~46–56°F); lake + Green Lake are warmer.
@@ -27,6 +32,7 @@ const SPOTS = [
     lng: -122.2764,
     swimType: 'Lifeguarded beach',
     water: 'Fresh',
+    kcBeach: 'Madison Park',
     swim: 'Sandy, calm, lifeguarded in summer — one of the nicer Lake Washington swims.',
     cafe: 'Corner Delights (2719 E Madison St) is explicitly remote-work friendly (fast wifi + outlets); Arosa Cafe and a Starbucks are also a short walk.',
     shade: 'Grassy, tree-lined park areas right at the beach.',
@@ -41,6 +47,7 @@ const SPOTS = [
     lng: -122.2847,
     swimType: 'Lifeguarded beach',
     water: 'Fresh',
+    kcBeach: 'Madrona',
     swim: 'Lifeguarded; wooded hillside drops to a grassy swim area with a lakeside jogging path.',
     cafe: 'Up the hill on the Madrona strip (34th Ave); Temple Pastries (Leschi/Central, ~100Mbps wifi, lots of seating) is a short drive.',
     shade: 'Wooded hillside — genuinely shady.',
@@ -55,6 +62,7 @@ const SPOTS = [
     lng: -122.2860,
     swimType: 'Lifeguarded beach',
     water: 'Fresh',
+    kcBeach: 'Mt Baker',
     swim: 'Lifeguarded summer beach with a swim float (1-meter board some years).',
     cafe: 'Mount Baker / Columbia City cafes a short drive; Caffe Vita Seward Park is nearby.',
     shade: 'Mount Baker Park has trees + lawn behind the beach.',
@@ -69,6 +77,7 @@ const SPOTS = [
     lng: -122.2580,
     swimType: 'Lifeguarded beach',
     water: 'Fresh',
+    kcBeach: 'Seward Park',
     swim: 'Lifeguarded beach on a forested peninsula; warm freshwater in summer.',
     cafe: 'Caffe Vita Seward Park (5028 Wilson Ave S) — very work-friendly, outlets + free wifi, 6a–6p.',
     shade: 'Old-growth forest loop = excellent shade. Top pick for a shaded work day.',
@@ -83,6 +92,7 @@ const SPOTS = [
     lng: -122.2649,
     swimType: 'Lifeguarded beach',
     water: 'Fresh',
+    kcBeach: 'Pritchard',
     swim: 'Lifeguarded neighborhood beach in Rainier Beach.',
     cafe: 'Limited right at the beach; Rainier Beach / Columbia City options are a short drive.',
     shade: 'Grassy park with trees.',
@@ -97,6 +107,7 @@ const SPOTS = [
     lng: -122.2733,
     swimType: 'Lifeguarded beach',
     water: 'Fresh',
+    kcBeach: 'Matthews',
     swim: "Seattle's largest freshwater bathing beach; lifeguarded; sits right on the Burke-Gilman Trail.",
     cafe: 'Cafes in Wedgwood / Sand Point a short ride away; easy trailside coffee stops.',
     shade: 'Big park with mature trees.',
@@ -111,6 +122,7 @@ const SPOTS = [
     lng: -122.2538,
     swimType: 'Lifeguarded beach',
     water: 'Fresh',
+    kcBeach: 'Magnuson',
     swim: 'Lifeguarded daily late June–late Aug; swim platform, Mt. Rainier views, outdoor shower.',
     cafe: 'Magnuson Cafe & Brewery (7801 62nd Ave NE) — espresso + coffee on a large covered, heated lake-view deck.',
     shade: '350-acre park with trails; the beach itself is open, so bring shade.',
@@ -157,6 +169,7 @@ const SPOTS = [
     lng: -122.3258,
     swimType: 'Lifeguarded beach',
     water: 'Fresh',
+    kcBeach: 'Green Lake East',
     swim: 'Lifeguarded; warmer and calmer than Lake Washington — great for a quick dip.',
     cafe: 'Revolutions Coffee (7208 E Green Lake Dr N) is lakefront, no music, big tables, wifi til 8p; Starbucks (7100) has ~15 outlets.',
     shade: 'Tree cover along the east/north side of the 2.8-mi loop.',
@@ -171,6 +184,7 @@ const SPOTS = [
     lng: -122.3401,
     swimType: 'Lifeguarded beach',
     water: 'Fresh',
+    kcBeach: 'Green Lake West',
     swim: 'Lifeguarded; fixed platforms with a 50-yard lap lane.',
     cafe: 'PCC Green Lake Village + west-side cafes; Retreat (6900 E Green Lake Way N) has food + a workspace vibe.',
     shade: 'Shaded stretches along the loop trail.',

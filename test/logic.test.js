@@ -82,6 +82,23 @@ test('recommendSwimSpots returns [] without a valid origin', () => {
   assert.deepEqual(Logic.recommendSwimSpots([{ id: 'a', swimType: 'Heated pool', lat: 47.6, lng: -122.3 }], null, []), []);
 });
 
+test('waterStatus maps King County records to an advisory', () => {
+  assert.equal(Logic.waterStatus(null), 'unknown', 'no record -> unknown');
+  assert.equal(Logic.waterStatus({ hightoday: true, geomean30d: 5 }), 'high', 'flagged today -> high');
+  assert.equal(Logic.waterStatus({ hightoday: 'true', geomean30d: 5 }), 'high', 'string boolean -> high');
+  assert.equal(Logic.waterStatus({ hightoday: false, geomean30d: 200 }), 'caution', 'over limit -> caution');
+  assert.equal(Logic.waterStatus({ hightoday: false, geomean30d: '14.5' }), 'ok', 'string geomean within limit -> ok');
+  assert.equal(Logic.waterStatus({ hightoday: false, geomean30d: 126 }), 'ok', 'exactly at the limit is still ok');
+  assert.equal(Logic.waterStatus({ hightoday: false, geomean30d: null }), 'unknown', 'no geomean -> unknown');
+});
+
+test('water status has a label + hex color for every status', () => {
+  for (const status of ['ok', 'caution', 'high', 'unknown', 'unmonitored']) {
+    assert.equal(typeof Logic.WATER_STATUS_LABELS[status], 'string');
+    assert.match(Logic.WATER_STATUS_COLORS[status], /^#[0-9a-f]{6}$/i);
+  }
+});
+
 test('coerceRating clamps to integer 0..5', () => {
   assert.equal(Logic.coerceRating(3), 3);
   assert.equal(Logic.coerceRating('4'), 4);

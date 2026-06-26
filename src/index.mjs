@@ -10,6 +10,8 @@
  * GET    /api/entries?spotId=ID  -> { entries: [...] }   (single spot)
  * PUT    /api/entries            -> upsert one entry (JSON body)
  * DELETE /api/entries?spotId=&authorId=  -> delete one entry
+ * GET    /api/geocode?q=<place>  -> { result: { lat, lng, label } | null }
+ * GET    /api/water              -> latest King County freshwater quality per beach
  *
  * NOTE: there is no authentication yet — the author identity comes from the
  * client's local profile, so anyone could write as anyone. This is the
@@ -43,6 +45,13 @@ export function clampRating(value) {
   const n = Math.round(Number(value));
   if (!Number.isFinite(n) || n < 0) return 0;
   return n > 5 ? 5 : n;
+}
+
+/** Coerce a Socrata string field to a finite number, or null when absent. */
+export function toNum(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
 }
 
 async function getEntries(request, env) {
@@ -169,12 +178,81 @@ async function geocode(request, env, ctx) {
   return out;
 }
 
+// King County publishes swim-beach bacteria + water temperature as Socrata
+// open data (no key). https://data.kingcounty.gov/resource/mbzm-4r9y
+const KC_WATER_URL = 'https://data.kingcounty.gov/resource/mbzm-4r9y.json';
+
+/**
+ * Latest King County swim-beach reading per (freshwater) beach. We pull the
+ * current season's samples, reduce to the newest reading per beach, and cache
+ * the result for 6 hours so the dashboard isn't re-queried on every page load.
+ * Returns { source, updated, beaches: { name: {date, geomean30d, hightoday,
+ * nsampleshigh30d, watertempf} } }; the client derives the status label/color.
+ */
+async function waterQuality(request, env, ctx) {
+  const cache = typeof caches !== 'undefined' ? caches.default : null;
+  const cacheKey = new Request('https://water.internal/kc');
+  if (cache) {
+    const hit = await cache.match(cacheKey);
+    if (hit) return hit;
+  }
+
+  // Last ~150 days keeps us inside the (mid-May–mid-Sep) sampling season.
+  const since = new Date(Date.now() - 150 * 86400000).toISOString().slice(0, 10);
+  const upstream = new URL(KC_WATER_URL);
+  upstream.searchParams.set('$where', `date >= '${since}'`);
+  upstream.searchParams.set('$order', 'date DESC');
+  upstream.searchParams.set('$limit', '5000');
+
+  let res;
+  try {
+    res = await fetch(upstream.toString(), { headers: { Accept: 'application/json' } });
+  } catch (_) {
+    return json({ error: 'Water-quality service unavailable' }, 502);
+  }
+  if (!res.ok) return json({ error: `Water-quality fetch failed (${res.status})` }, 502);
+
+  let rows;
+  try {
+    rows = await res.json();
+  } catch (_) {
+    return json({ error: 'Bad water-quality response' }, 502);
+  }
+
+  const beaches = {};
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const name = row && row.beach;
+    if (!name || beaches[name]) continue; // ordered date DESC -> first hit is latest
+    beaches[name] = {
+      date: row.date ? String(row.date).slice(0, 10) : null,
+      geomean30d: toNum(row.geomean30d),
+      hightoday: row.hightoday === true || row.hightoday === 'true',
+      nsampleshigh30d: toNum(row.nsampleshigh30d),
+      watertempf: toNum(row.watertempf),
+    };
+  }
+
+  const out = json({
+    source: 'King County Swim Beach Monitoring',
+    updated: new Date().toISOString(),
+    beaches,
+  });
+  out.headers.set('cache-control', 'public, max-age=21600');
+  if (cache && ctx && ctx.waitUntil) ctx.waitUntil(cache.put(cacheKey, out.clone()));
+  return out;
+}
+
 async function handleApi(request, env, ctx) {
   const url = new URL(request.url);
 
   if (url.pathname === '/api/geocode') {
     if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
     return geocode(request, env, ctx);
+  }
+
+  if (url.pathname === '/api/water') {
+    if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
+    return waterQuality(request, env, ctx);
   }
 
   if (url.pathname !== '/api/entries') {

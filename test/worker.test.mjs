@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import worker, { clampRating, rowToEntry } from '../src/index.mjs';
+import worker, { clampRating, rowToEntry, toNum } from '../src/index.mjs';
 
 // Minimal in-memory stand-in for the D1 binding used by the Worker.
 function makeMockDB(initialRows = []) {
@@ -178,6 +178,62 @@ test('GET /api/geocode surfaces upstream failure as 502', async () => {
   } finally {
     globalThis.fetch = origFetch;
   }
+});
+
+test('GET /api/water returns the latest reading per beach, numbers coerced', async () => {
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify([
+        // Newest Madrona row first (matches the Worker's date DESC order).
+        { beach: 'Madrona', date: '2026-06-16', geomean30d: '14.5', hightoday: false, nsampleshigh30d: '0', watertempf: '70.2' },
+        { beach: 'Madrona', date: '2026-06-09', geomean30d: '99', hightoday: true, nsampleshigh30d: '2', watertempf: '68.0' },
+        { beach: 'Seward Park', date: '2026-06-16', geomean30d: '200', hightoday: false, nsampleshigh30d: '4', watertempf: '' },
+      ]),
+      { status: 200, headers: { 'content-type': 'application/json' } }
+    );
+  try {
+    const res = await worker.fetch(req('/api/water'), { ASSETS: assets }, { waitUntil() {} });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.source, 'King County Swim Beach Monitoring');
+    assert.deepEqual(body.beaches.Madrona, {
+      date: '2026-06-16',
+      geomean30d: 14.5,
+      hightoday: false,
+      nsampleshigh30d: 0,
+      watertempf: 70.2,
+    });
+    assert.equal(body.beaches['Seward Park'].geomean30d, 200);
+    assert.equal(body.beaches['Seward Park'].watertempf, null, 'empty temp -> null');
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+});
+
+test('GET /api/water surfaces upstream failure as 502', async () => {
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response('nope', { status: 500 });
+  try {
+    const res = await worker.fetch(req('/api/water'), { ASSETS: assets }, { waitUntil() {} });
+    assert.equal(res.status, 502);
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+});
+
+test('non-GET /api/water is rejected', async () => {
+  const res = await worker.fetch(req('/api/water', { method: 'POST' }), { ASSETS: assets }, { waitUntil() {} });
+  assert.equal(res.status, 405);
+});
+
+test('toNum coerces strings, blanks, and bad values', () => {
+  assert.equal(toNum('14.5'), 14.5);
+  assert.equal(toNum(''), null);
+  assert.equal(toNum(null), null);
+  assert.equal(toNum(undefined), null);
+  assert.equal(toNum('nope'), null);
+  assert.equal(toNum(0), 0);
 });
 
 test('clampRating + rowToEntry helpers behave', () => {

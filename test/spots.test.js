@@ -35,3 +35,17 @@ test('every spot has valid coordinates inside the Seattle area', () => {
     assert.ok(spot.lng > -122.6 && spot.lng < -122.1, `${spot.id} lng ${spot.lng} out of range`);
   }
 });
+
+test('kcBeach is only set on freshwater swimmable spots and is a non-empty name', () => {
+  const monitored = SPOTS.filter((s) => 'kcBeach' in s);
+  assert.ok(monitored.length >= 9, `expected >=9 monitored beaches, got ${monitored.length}`);
+  for (const spot of monitored) {
+    assert.equal(typeof spot.kcBeach, 'string');
+    assert.ok(spot.kcBeach.trim().length > 0, `${spot.id} has empty kcBeach`);
+    assert.equal(spot.water, 'Fresh', `${spot.id} kcBeach should map a freshwater spot`);
+    assert.ok(Logic.isSwimmable(spot), `${spot.id} kcBeach should map a swimmable spot`);
+  }
+  // No duplicate beach names across spots (each maps a distinct beach).
+  const names = monitored.map((s) => s.kcBeach);
+  assert.equal(new Set(names).size, names.length, 'kcBeach names must be unique');
+});

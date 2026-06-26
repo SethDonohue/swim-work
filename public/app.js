@@ -20,6 +20,7 @@
   const state = {
     profile: null,
     entries: [],
+    water: null, // { source, updated, beaches: { name: {...} } } from /api/water
     mode: 'local', // 'cloud' | 'local'
     prefs: {
       showOthers: false,
@@ -96,6 +97,19 @@
     updateSyncPill();
   }
 
+  // Live freshwater quality (King County). Best-effort: if it fails, the
+  // chips just don't appear — the rest of the app is unaffected.
+  async function loadWater() {
+    try {
+      const res = await fetch('/api/water', { headers: { accept: 'application/json' } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      state.water = data && data.beaches ? data : null;
+    } catch (_) {
+      state.water = null;
+    }
+  }
+
   async function persistEntry(entry) {
     // Optimistic local update + cache first.
     state.entries = Logic.upsertEntry(state.entries, entry);
@@ -160,6 +174,8 @@
     $('#profile-name').textContent = profile.name;
     await loadEntries();
     render();
+    // Fetch water quality in the background; re-render to show chips when ready.
+    loadWater().then(() => render());
   }
 
   // ---------------------------------------------------------------------------
@@ -278,6 +294,50 @@
     return 'badge ' + (SWIM_BADGE_CLASS[swimType] || 'badge--swim-none');
   }
 
+  // Short "Jun 16" date; noon avoids a timezone roll-back to the prior day.
+  function formatShortDate(iso) {
+    if (!iso) return '';
+    const d = new Date(`${iso}T12:00:00`);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  /**
+   * Water-quality badge for a spot. Monitored freshwater beaches show a live,
+   * color-coded reading (status · temp · date); swimmable saltwater/unmonitored
+   * spots show a muted "Not monitored" chip. View-only spots get no chip.
+   */
+  function waterChip(spot) {
+    if (!Logic.isSwimmable(spot)) return null;
+
+    if (spot.kcBeach) {
+      if (!state.water || !state.water.beaches) return null; // not loaded yet
+      const rec = state.water.beaches[spot.kcBeach];
+      const status = Logic.waterStatus(rec);
+      const color = Logic.WATER_STATUS_COLORS[status];
+      const parts = ['💧 ' + Logic.WATER_STATUS_LABELS[status]];
+      if (rec && rec.watertempf != null) parts.push(`${Math.round(rec.watertempf)}°F`);
+      if (rec && rec.date) parts.push(formatShortDate(rec.date));
+      const gm = rec && rec.geomean30d != null ? Math.round(rec.geomean30d) : null;
+      return el('span', {
+        class: 'badge badge--waterq',
+        text: parts.join(' · '),
+        style: `border-color:${color};color:${color};background:color-mix(in srgb, ${color} 16%, transparent)`,
+        title:
+          (gm != null ? `30-day E. coli geomean: ${gm} MPN/100mL (rec. limit 126). ` : '') +
+          'Source: King County Swim Beach Monitoring — always check the official advisory before swimming.',
+      });
+    }
+
+    return el('span', {
+      class: 'badge badge--waterq-na',
+      text: '💧 Not monitored',
+      title:
+        'No King County freshwater sampling here (saltwater or unmonitored). ' +
+        'Check posted advisories before swimming.',
+    });
+  }
+
   function renderCard(spot) {
     const mine = Logic.myEntry(state.entries, spot.id, state.profile.id);
     const visited = !!(mine && mine.visited);
@@ -296,12 +356,13 @@
       ])
     );
 
-    card.appendChild(
-      el('div', { class: 'badges' }, [
-        el('span', { class: badgeClassForSwim(spot.swimType), text: spot.swimType }),
-        el('span', { class: 'badge badge--water', text: spot.water + 'water' }),
-      ])
-    );
+    const badges = [
+      el('span', { class: badgeClassForSwim(spot.swimType), text: spot.swimType }),
+      el('span', { class: 'badge badge--water', text: spot.water + 'water' }),
+    ];
+    const wq = waterChip(spot);
+    if (wq) badges.push(wq);
+    card.appendChild(el('div', { class: 'badges' }, badges));
 
     card.appendChild(detailRow('🏊', 'Swim', spot.swim));
     card.appendChild(detailRow('☕', 'Work', spot.cafe));
@@ -537,6 +598,7 @@
       el('h3', { class: 'mappop__title', text: spot.name }),
       el('span', { class: badgeClassForSwim(spot.swimType), text: spot.swimType }),
       el('p', { class: 'mappop__swim', text: spot.swim }),
+      waterChip(spot),
       el('div', { class: 'mappop__actions' }, [
         el('button', {
           class: 'btn btn--primary mappop__btn',

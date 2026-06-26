@@ -97,6 +97,46 @@ const Logic = {
     return scored.slice(0, limit);
   },
 
+  /**
+   * EPA recreational-water threshold for the 30-day E. coli geometric mean
+   * (MPN/100mL). Above this, freshwater is flagged for caution.
+   */
+  WATER_GEOMEAN_LIMIT: 126,
+
+  /** Human labels for each derived water-quality status. */
+  WATER_STATUS_LABELS: {
+    ok: 'Good',
+    caution: 'Caution',
+    high: 'High bacteria',
+    unknown: 'No recent data',
+    unmonitored: 'Not monitored',
+  },
+
+  /** Status colors (kept beside the labels so card chips + tests agree). */
+  WATER_STATUS_COLORS: {
+    ok: '#1f9d55',
+    caution: '#b8860d',
+    high: '#c0392b',
+    unknown: '#8aa0b3',
+    unmonitored: '#8aa0b3',
+  },
+
+  /**
+   * Derive an advisory from a King County swim-beach record. The dataset
+   * reports bacteria levels (not an official open/closed call), so we map
+   * conservatively: a sample flagged high today -> 'high'; a 30-day geomean
+   * over the EPA limit -> 'caution'; otherwise 'ok'. Missing data -> 'unknown'.
+   */
+  waterStatus(rec) {
+    if (!rec) return 'unknown';
+    if (rec.hightoday === true || rec.hightoday === 'true') return 'high';
+    const raw = rec.geomean30d;
+    if (raw === null || raw === undefined || raw === '') return 'unknown';
+    const gm = Number(raw); // guard above: Number(null/'') is 0 and would read as "ok"
+    if (Number.isFinite(gm)) return gm > Logic.WATER_GEOMEAN_LIMIT ? 'caution' : 'ok';
+    return 'unknown';
+  },
+
   /** Google Maps search link from the spot's name + address. */
   buildMapUrl(spot) {
     const query = encodeURIComponent(`${spot.name} ${spot.address || ''}`.trim());
