@@ -186,6 +186,7 @@
     'Heated pool': 'badge--swim-pool',
     'Saltwater beach': 'badge--swim-salt',
     'Beach (no lifeguard)': 'badge--swim-nolifeguard',
+    'Shoreline access': 'badge--swim-shoreline',
     'Tide pools': 'badge--swim-tide',
     'No swimming': 'badge--swim-none',
   };
@@ -689,6 +690,7 @@
       'Heated pool',
       'Saltwater beach',
       'Beach (no lifeguard)',
+      'Shoreline access',
       'Tide pools',
       'No swimming',
     ];

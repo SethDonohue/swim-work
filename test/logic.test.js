@@ -10,6 +10,7 @@ test('isSwimmable distinguishes water access from view-only spots', () => {
   assert.equal(Logic.isSwimmable({ swimType: 'Heated pool' }), true);
   assert.equal(Logic.isSwimmable({ swimType: 'Saltwater beach' }), true);
   assert.equal(Logic.isSwimmable({ swimType: 'Beach (no lifeguard)' }), true);
+  assert.equal(Logic.isSwimmable({ swimType: 'Shoreline access' }), true);
   assert.equal(Logic.isSwimmable({ swimType: 'No swimming' }), false);
   assert.equal(Logic.isSwimmable({ swimType: 'Tide pools' }), false);
 });
@@ -23,6 +24,7 @@ test('buildMapUrl encodes name + address', () => {
 test('swimTypeColor returns a hex color per type with a fallback', () => {
   assert.equal(Logic.swimTypeColor('Lifeguarded beach'), '#1f9d55');
   assert.equal(Logic.swimTypeColor('Heated pool'), '#0d7fb8');
+  assert.equal(Logic.swimTypeColor('Shoreline access'), '#0e9aa7');
   assert.match(Logic.swimTypeColor('Tide pools'), /^#[0-9a-f]{6}$/i);
   assert.match(Logic.swimTypeColor('something unknown'), /^#[0-9a-f]{6}$/i);
 });

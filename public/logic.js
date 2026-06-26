@@ -9,6 +9,7 @@ const Logic = {
     'Heated pool',
     'Saltwater beach',
     'Beach (no lifeguard)',
+    'Shoreline access',
   ],
 
   isSwimmable(spot) {
@@ -21,6 +22,7 @@ const Logic = {
     'Heated pool': '#0d7fb8',
     'Saltwater beach': '#b8860d',
     'Beach (no lifeguard)': '#b8860d',
+    'Shoreline access': '#0e9aa7',
     'Tide pools': '#7a5cc0',
     'No swimming': '#8aa0b3',
   },
@@ -263,6 +265,7 @@ const Logic = {
       'Heated pool',
       'Saltwater beach',
       'Beach (no lifeguard)',
+      'Shoreline access',
       'Tide pools',
       'No swimming',
     ];

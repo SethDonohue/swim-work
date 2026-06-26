@@ -6,7 +6,9 @@
  *
  * swimType drives the badge + the "swimmable only" filter:
  *   'Lifeguarded beach' | 'Heated pool' | 'Saltwater beach'
- *   'Beach (no lifeguard)' | 'Tide pools' | 'No swimming'
+ *   'Beach (no lifeguard)' | 'Shoreline access' | 'Tide pools' | 'No swimming'
+ *   ('Shoreline access' = informal public water access, e.g. SDOT shoreline
+ *    street ends and small waterfront parks — counts as swimmable.)
  *
  * lat/lng are approximate (good enough to drop a map marker at the spot).
  *
@@ -157,6 +159,49 @@ const SPOTS = [
     tags: ['no-lifeguard', 'freshwater', 'wifi-cafe', 'shaded'],
   },
 
+  {
+    id: 'colman-park',
+    name: 'Colman Park',
+    area: 'Lake Washington',
+    address: '1800 Lake Washington Blvd S, Seattle, WA 98144',
+    lat: 47.5858,
+    lng: -122.2877,
+    swimType: 'Beach (no lifeguard)',
+    water: 'Fresh',
+    swim: 'Grassy Lake Washington Blvd shoreline with informal swimming (no lifeguard); connects to Mount Baker Beach just south.',
+    cafe: 'Mount Baker / Leschi cafes a short drive.',
+    shade: 'Wooded boulevard with lawns and big trees.',
+    tags: ['no-lifeguard', 'freshwater', 'shaded', 'quiet'],
+  },
+  {
+    id: 'stan-sayres-andrews-bay',
+    name: 'Stan Sayres Park / Andrews Bay',
+    area: 'Lake Washington',
+    address: '3808 Lake Washington Blvd S, Seattle, WA 98118',
+    lat: 47.5709,
+    lng: -122.2773,
+    swimType: 'Beach (no lifeguard)',
+    water: 'Fresh',
+    swim: 'Hydroplane park beside Andrews Bay — a calm, shallow cove off Seward Park that locals love for warm-water swimming and rafting (no lifeguard).',
+    cafe: 'Caffe Vita Seward Park is minutes away (work-friendly, outlets + wifi).',
+    shade: 'Open lawns; Seward Park forest is right next door.',
+    tags: ['no-lifeguard', 'freshwater', 'calm', 'paddle'],
+  },
+  {
+    id: 'beer-sheva-atlantic-city',
+    name: "Be'er Sheva Park / Atlantic City Beach",
+    area: 'Lake Washington',
+    address: '8650 55th Ave S, Seattle, WA 98118',
+    lat: 47.5240,
+    lng: -122.2634,
+    swimType: 'Beach (no lifeguard)',
+    water: 'Fresh',
+    swim: 'South-end Lake Washington park by the Atlantic City Boat Ramp; sandy shoreline with informal swimming (no lifeguard).',
+    cafe: 'Rainier Beach options a short drive.',
+    shade: 'Grassy park with some trees.',
+    tags: ['no-lifeguard', 'freshwater', 'sandy', 'boat-ramp'],
+  },
+
   // ---------------------------------------------------------------------------
   // GREEN LAKE (the "in-between" sweet spot)
   // ---------------------------------------------------------------------------
@@ -235,6 +280,49 @@ const SPOTS = [
     cafe: 'Westward (restaurant/bar, waterside seating); Fremont/Wallingford coffee a few minutes away.',
     shade: 'Waterfront patio; limited shade.',
     tags: ['no-swimming', 'views', 'waterfront'],
+  },
+
+  {
+    id: 'hamlin-street-end',
+    name: 'Hamlin Shoreline Street End',
+    area: 'Lake Union',
+    address: 'E Hamlin St shoreline street end, Seattle, WA 98102',
+    lat: 47.6456,
+    lng: -122.3272,
+    swimType: 'Shoreline access',
+    water: 'Fresh',
+    swim: 'Public shoreline street end on Lake Union — a small, informal spot to launch a paddle or take a quick dip. Unmonitored; mind boat traffic.',
+    cafe: 'Eastlake / Wallingford cafes a few minutes away (Milstead & Co. is work-friendly).',
+    shade: 'Little shade at the water — bring your own.',
+    tags: ['shoreline-street-end', 'freshwater', 'paddle', 'quiet'],
+  },
+  {
+    id: 'e-louisa-street-end',
+    name: 'E Louisa St Shoreline Street End',
+    area: 'Lake Union',
+    address: 'E Louisa St shoreline street end, Seattle, WA 98102',
+    lat: 47.6420,
+    lng: -122.3262,
+    swimType: 'Shoreline access',
+    water: 'Fresh',
+    swim: 'Eastlake public shore at the foot of E Louisa St — a low-key Lake Union access point for a swim or paddle between the houseboats. Informal and unmonitored.',
+    cafe: 'Eastlake Ave cafes are a short walk (e.g. Voxx Coffee).',
+    shade: 'Houseboat-lined shore; minimal shade.',
+    tags: ['shoreline-street-end', 'freshwater', 'paddle', 'quiet'],
+  },
+  {
+    id: 'terry-pettus-park',
+    name: 'Terry Pettus Park',
+    area: 'Lake Union',
+    address: 'E Newton St & Fairview Ave E, Seattle, WA 98102',
+    lat: 47.6367,
+    lng: -122.3292,
+    swimType: 'Shoreline access',
+    water: 'Fresh',
+    swim: 'Grassy Eastlake waterfront park among the houseboats with steps to the water — a favorite for sunning, paddling, and a cool-off dip. No lifeguard.',
+    cafe: 'Eastlake cafes nearby (Voxx Coffee, Pomegranate Bistro).',
+    shade: 'Lawn with some trees and benches.',
+    tags: ['shoreline-street-end', 'freshwater', 'views', 'quiet'],
   },
 
   // ---------------------------------------------------------------------------
@@ -323,6 +411,112 @@ const SPOTS = [
     cafe: 'Harbor Ave — Marination Ma Kai and coffee nearby.',
     shade: 'Walking path; limited shade.',
     tags: ['saltwater', 'views', 'no-lifeguard'],
+  },
+  {
+    id: 'seacrest-park',
+    name: 'Seacrest Park',
+    area: 'West Seattle',
+    address: '1660 Harbor Ave SW, Seattle, WA 98126',
+    lat: 47.5888,
+    lng: -122.3801,
+    swimType: 'Shoreline access',
+    water: 'Salt',
+    swim: 'Elliott Bay cove with a seawall, dock, and ramp — a popular cold-water swim and scuba entry with downtown skyline views (no beach). Cold Sound water year-round.',
+    cafe: 'Marination Ma Kai is right here; coffee along Harbor Ave SW.',
+    shade: 'Waterfront promenade; limited shade.',
+    tags: ['saltwater', 'cold-water-swim', 'scuba', 'views', 'wifi-cafe'],
+  },
+
+  // ---------------------------------------------------------------------------
+  // BALLARD & NORTH (Shilshole, the Locks, north Sound beaches)
+  // ---------------------------------------------------------------------------
+  {
+    id: 'golden-gardens',
+    name: 'Golden Gardens Park',
+    area: 'Ballard & North',
+    address: '8498 Seaview Pl NW, Seattle, WA 98117',
+    lat: 47.6922,
+    lng: -122.4030,
+    swimType: 'Saltwater beach',
+    water: 'Salt',
+    swim: 'Sandy Puget Sound beach with summer swimming (no lifeguard), fire pits, and Olympic-mountain sunsets. Water stays cold (~50s°F).',
+    cafe: 'Seasonal beach concessions; Ballard cafes a short drive.',
+    shade: 'Open sand; wetlands and trees behind. Bring shade.',
+    tags: ['saltwater', 'no-lifeguard', 'sandy', 'sunsets', 'views'],
+  },
+  {
+    id: 'eddie-vine-boat-ramp',
+    name: 'Eddie Vine Boat Ramp (Shilshole)',
+    area: 'Ballard & North',
+    address: 'Seaview Ave NW, Seattle, WA 98107',
+    lat: 47.6869,
+    lng: -122.4038,
+    swimType: 'Shoreline access',
+    water: 'Salt',
+    swim: 'Public boat ramp and shoreline just south of Golden Gardens — saltwater launch/paddle access (not a swim beach; cold Sound water).',
+    cafe: 'Shilshole marina spots; Ballard cafes nearby.',
+    shade: 'Open; little shade.',
+    tags: ['saltwater', 'boat-ramp', 'paddle', 'views'],
+  },
+  {
+    id: 'commodore-park',
+    name: 'Commodore Park (Ballard Locks)',
+    area: 'Ballard & North',
+    address: '3330 W Commodore Way, Seattle, WA 98199',
+    lat: 47.6654,
+    lng: -122.4005,
+    swimType: 'No swimming',
+    water: 'Salt',
+    swim: 'Park on the south side of the Ballard Locks with the fish ladder and ship-canal views — no swimming, but a scenic water stop.',
+    cafe: 'Magnolia Village / Ballard cafes a short drive.',
+    shade: 'Grassy terraces with some trees.',
+    tags: ['no-swimming', 'locks', 'views', 'work-spot'],
+  },
+  {
+    id: 'carkeek-park',
+    name: 'Carkeek Park – South Beach',
+    area: 'Ballard & North',
+    address: '950 NW Carkeek Park Rd, Seattle, WA 98177',
+    lat: 47.7097,
+    lng: -122.3729,
+    swimType: 'Saltwater beach',
+    water: 'Salt',
+    swim: 'Puget Sound beach reached by a footbridge over the train tracks — driftwood, tide pools, and cold-water wading (no lifeguard). Salmon stream and trails behind.',
+    cafe: 'None on-site; Broadview / Greenwood cafes a drive away.',
+    shade: 'Forested ravine trails; the beach itself is open.',
+    tags: ['saltwater', 'no-lifeguard', 'tide-pools', 'nature', 'hike-in'],
+  },
+
+  // ---------------------------------------------------------------------------
+  // MAGNOLIA (Puget Sound bluffs + Discovery Park)
+  // ---------------------------------------------------------------------------
+  {
+    id: 'discovery-west-point',
+    name: 'Discovery Park – West Point Beach',
+    area: 'Magnolia',
+    address: '3801 Discovery Park Blvd, Seattle, WA 98199',
+    lat: 47.6620,
+    lng: -122.4357,
+    swimType: 'Saltwater beach',
+    water: 'Salt',
+    swim: 'Long, wild Puget Sound beach by the West Point Lighthouse — wading/swimming for the hardy (cold, no lifeguard) plus tide pools and miles of sand. A hike from the lot.',
+    cafe: 'None on-site; Magnolia Village cafes before you enter the park.',
+    shade: 'Bluff forest along the trails; the beach is open.',
+    tags: ['saltwater', 'no-lifeguard', 'tide-pools', 'views', 'hike-in'],
+  },
+  {
+    id: 'magnolia-park',
+    name: 'Magnolia Park',
+    area: 'Magnolia',
+    address: '1461 Magnolia Blvd W, Seattle, WA 98199',
+    lat: 47.6338,
+    lng: -122.3984,
+    swimType: 'No swimming',
+    water: 'Salt',
+    swim: 'Blufftop park on Magnolia Blvd with big Puget Sound + Mt. Rainier views — a picnic/viewpoint stop rather than a swim spot.',
+    cafe: 'Magnolia Village cafes a short drive.',
+    shade: 'Madrona-shaded lawns and benches.',
+    tags: ['no-swimming', 'views', 'shaded', 'picnic'],
   },
 ];
 

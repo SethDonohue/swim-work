@@ -572,6 +572,11 @@ input {
   border-color: #b8860d;
   color: #b8860d;
 }
+.badge--swim-shoreline {
+  background: color-mix(in srgb, #0e9aa7 18%, transparent);
+  border-color: #0e9aa7;
+  color: #0e9aa7;
+}
 .badge--swim-tide {
   background: color-mix(in srgb, #7a5cc0 18%, transparent);
   border-color: #7a5cc0;

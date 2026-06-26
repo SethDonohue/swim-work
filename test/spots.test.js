@@ -19,7 +19,23 @@ test('dataset covers all requested areas', () => {
 });
 
 test('dataset has a healthy number of spots', () => {
-  assert.ok(SPOTS.length >= 18, `expected >=18 spots, got ${SPOTS.length}`);
+  assert.ok(SPOTS.length >= 30, `expected >=30 spots, got ${SPOTS.length}`);
+});
+
+test('dataset includes the expanded northern + Magnolia areas', () => {
+  const areas = Logic.areaList(SPOTS);
+  for (const area of ['Ballard & North', 'Magnolia']) {
+    assert.ok(areas.includes(area), `expected area "${area}" in dataset`);
+  }
+});
+
+test('Shoreline access spots are present, swimmable, and validate', () => {
+  const shoreline = SPOTS.filter((s) => s.swimType === 'Shoreline access');
+  assert.ok(shoreline.length >= 3, `expected >=3 shoreline-access spots, got ${shoreline.length}`);
+  for (const spot of shoreline) {
+    assert.ok(Logic.isSwimmable(spot), `${spot.id} should count as swimmable`);
+    assert.match(Logic.swimTypeColor(spot.swimType), /^#[0-9a-f]{6}$/i);
+  }
 });
 
 test('every spot produces a usable map URL', () => {

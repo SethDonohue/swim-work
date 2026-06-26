@@ -1,8 +1,10 @@
 # Swim + Work Seattle
 
 A tiny static site that maps **swimmable spots around Seattle** (Lake Washington,
-Lake Union, West Seattle, plus Green Lake) paired with **cafes and shaded parks
-for working remotely**.
+Lake Union, Green Lake, West Seattle, Ballard/Shilshole, and Magnolia) paired with
+**cafes and shaded parks for working remotely**. Alongside the designated beaches
+it also includes informal **shoreline street ends** and small waterfront parks
+(some with little info and no water-quality monitoring).
 
 Each person signs in with a local profile and can:
 
@@ -238,7 +240,12 @@ The Worker (`src/index.mjs`) exposes:
 
 Seattle Parks runs **free lifeguarded beaches** (Lake Washington + Green Lake)
 roughly **late June – early September** (2026: ~Jun 27 – Sep 7). Puget Sound
-spots (Alki, Golden Gardens, West Seattle shoreline) stay **cold year-round
-(~46–56°F)**. Lake Union has **no legal swimming** (hazardous sediment / spraypark
-only) — those entries are included as work-with-a-view stops and labeled
-accordingly. Always check current conditions before getting in the water.
+spots (Alki, Golden Gardens, Discovery Park, West Seattle shoreline) stay **cold
+year-round (~46–56°F)**.
+
+**Central Lake Union** (Gas Works, the park, Westward) has **no legal swimming**
+(hazardous sediment / spraypark only) and is labeled accordingly. The **Eastlake /
+Portage Bay shoreline street ends** (Hamlin, E Louisa, Terry Pettus) are public
+water-access points where locals do swim/paddle — they're tagged **"Shoreline
+access"**, are **not** water-quality monitored, and are informal/at-your-own-risk.
+Always check current conditions before getting in the water.
