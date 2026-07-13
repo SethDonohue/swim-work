@@ -12,8 +12,38 @@ const Logic = {
     'Shoreline access',
   ],
 
+  /** The three things a spot can be "good for" (drives the category filter). */
+  CATEGORIES: ['swim', 'play', 'work'],
+
+  /** Tags that mark a spot as remote-work friendly (cafe wifi / work stop). */
+  WORK_TAGS: ['wifi-cafe', 'work-spot', 'lake-view-cafe'],
+
+  isSwimmableType(swimType) {
+    return Logic.SWIMMABLE_TYPES.indexOf(swimType) !== -1;
+  },
+
+  /**
+   * What a spot is good for — any subset of swim / play / work. Uses an
+   * explicit `spot.goodFor` when provided; otherwise derives it: swimmable
+   * swim types get 'swim', every spot is 'play', and work-friendly spots (a
+   * wifi-cafe / work tag, or a no-swim "work-with-a-view" stop) get 'work'.
+   */
+  spotGoodFor(spot) {
+    if (!spot) return [];
+    if (Array.isArray(spot.goodFor) && spot.goodFor.length) {
+      return spot.goodFor.filter((g) => Logic.CATEGORIES.indexOf(g) !== -1);
+    }
+    const g = [];
+    if (Logic.isSwimmableType(spot.swimType)) g.push('swim');
+    g.push('play');
+    const tags = spot.tags || [];
+    const workTag = tags.some((t) => Logic.WORK_TAGS.indexOf(t) !== -1);
+    if (workTag || spot.swimType === 'No swimming') g.push('work');
+    return g;
+  },
+
   isSwimmable(spot) {
-    return Logic.SWIMMABLE_TYPES.indexOf(spot.swimType) !== -1;
+    return Logic.spotGoodFor(spot).indexOf('swim') !== -1;
   },
 
   /** Marker / swatch color per swim type (kept here so the map + tests agree). */
@@ -166,7 +196,11 @@ const Logic = {
   spotMatchesFilters(spot, filters) {
     const f = filters || {};
     if (f.area && f.area !== 'All' && spot.area !== f.area) return false;
-    if (f.swimmableOnly && !Logic.isSwimmable(spot)) return false;
+    // `category` supersedes the legacy `swimmableOnly` flag ('swim' == old behavior).
+    const category = f.category || (f.swimmableOnly ? 'swim' : 'all');
+    if (category && category !== 'all' && Logic.spotGoodFor(spot).indexOf(category) === -1) {
+      return false;
+    }
     const q = (f.query || '').trim().toLowerCase();
     if (q) {
       const haystack = [
@@ -289,12 +323,22 @@ const Logic = {
       if (!Logic.hasCoords(spot)) {
         errors.push(`${label}: missing or invalid lat/lng`);
       } else {
-        // Sanity-check the marker sits inside the greater-Seattle bounding box.
-        if (spot.lat < 47.3 || spot.lat > 47.9) errors.push(`${label}: lat out of Seattle range`);
-        if (spot.lng < -122.6 || spot.lng > -122.1) errors.push(`${label}: lng out of Seattle range`);
+        // Sanity box: Tacoma/Lakewood (south) up to Edmonds (north) and out
+        // the I-90 corridor (east) — the widened coverage area.
+        if (spot.lat < 47.05 || spot.lat > 47.95) errors.push(`${label}: lat out of range`);
+        if (spot.lng < -122.75 || spot.lng > -121.3) errors.push(`${label}: lng out of range`);
       }
       if (spot.tags && !Array.isArray(spot.tags)) {
         errors.push(`${label}: tags must be an array`);
+      }
+      if (spot.goodFor) {
+        if (!Array.isArray(spot.goodFor)) {
+          errors.push(`${label}: goodFor must be an array`);
+        } else {
+          for (const g of spot.goodFor) {
+            if (Logic.CATEGORIES.indexOf(g) === -1) errors.push(`${label}: invalid goodFor "${g}"`);
+          }
+        }
       }
     });
     return errors;

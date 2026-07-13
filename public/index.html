@@ -4,11 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
-    <title>Swim + Work Seattle</title>
+    <title>Swim, Play + Work Seattle</title>
     <meta
       name="description"
-      content="Seattle swim spots paired with cafes and shaded parks for remote work."
+      content="Puget Sound-area swim beaches, waterfront parks, and remote-work spots (cafe wifi + shaded parks), from Tacoma to Edmonds and out the I-90 corridor."
     />
+    <meta name="theme-color" content="#0e9aa7" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Swim Play Work" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="icon" href="icon-192.png" sizes="192x192" type="image/png" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -21,10 +30,11 @@
     <!-- Login / profile gate -->
     <div id="login" class="login" hidden>
       <div class="login__card">
-        <h1 class="login__title">Swim + Work <span>Seattle</span></h1>
+        <h1 class="login__title">Swim, Play + Work <span>Seattle</span></h1>
         <p class="login__sub">
-          Swimmable spots paired with cafes &amp; shaded parks for working remotely.
-          Pick a name to track your own check-offs, ratings, and comments.
+          Swim beaches, waterfront parks, and remote-work spots (cafe wifi &amp; shaded
+          parks) across the Puget Sound area. Pick a name to track your own check-offs,
+          ratings, and comments.
         </p>
         <form id="login-form" class="login__form" autocomplete="off">
           <label class="field">
@@ -53,7 +63,7 @@
         <div class="topbar__brand">
           <span class="topbar__logo" aria-hidden="true">🏊</span>
           <div>
-            <h1 class="topbar__title">Swim + Work <span>Seattle</span></h1>
+            <h1 class="topbar__title">Swim, Play + Work <span>Seattle</span></h1>
             <p id="progress" class="topbar__progress">—</p>
           </div>
         </div>
@@ -84,10 +94,20 @@
             placeholder="Search spots, cafes, tags…"
             aria-label="Search spots"
           />
-          <label class="filters__check">
-            <input id="swimmable-only" type="checkbox" />
-            <span>Swimmable only</span>
-          </label>
+          <div class="catfilter" role="group" aria-label="Filter by category">
+            <button id="cat-all" class="catfilter__btn is-active" type="button" data-cat="all" aria-pressed="true">
+              All
+            </button>
+            <button id="cat-swim" class="catfilter__btn" type="button" data-cat="swim" aria-pressed="false">
+              🏊 Swim
+            </button>
+            <button id="cat-play" class="catfilter__btn" type="button" data-cat="play" aria-pressed="false">
+              🌳 Play
+            </button>
+            <button id="cat-work" class="catfilter__btn" type="button" data-cat="work" aria-pressed="false">
+              💻 Work
+            </button>
+          </div>
           <div class="viewtoggle" role="group" aria-label="View mode">
             <button id="view-list" class="viewtoggle__btn is-active" type="button" aria-pressed="true">
               List
@@ -134,15 +154,17 @@
 
       <footer class="footer">
         <p>
-          Lifeguarded beaches (Lake Washington + Green Lake) run roughly
-          <strong>late June – early September</strong>. Puget Sound spots stay cold
-          (~46–56°F) year-round. Always check current conditions before swimming.
+          Lifeguarded lake beaches (King County) run roughly
+          <strong>late June – early September</strong>. Puget Sound &amp; river spots
+          stay cold (~46–56°F) and have no lifeguards. Always check current conditions
+          before swimming.
         </p>
         <p class="footer__src">
           Freshwater quality (💧) from
           <a href="https://green2.kingcounty.gov/swimbeach/" target="_blank" rel="noopener">King County Swim Beach Monitoring</a>
-          — sampled weekly in summer; it's an advisory, not a closure. Saltwater &amp;
-          unmonitored spots show “Not monitored”. Map data © OpenStreetMap.
+          — sampled weekly in summer; it's an advisory, not a closure. Only King County
+          freshwater beaches are monitored; saltwater, river, and Snohomish/Pierce County
+          spots show “Not monitored”. Map data © OpenStreetMap.
         </p>
       </footer>
     </div>

@@ -1,10 +1,18 @@
-# Swim + Work Seattle
+# Swim, Play + Work Seattle
 
-A tiny static site that maps **swimmable spots around Seattle** (Lake Washington,
-Lake Union, Green Lake, West Seattle, Ballard/Shilshole, and Magnolia) paired with
-**cafes and shaded parks for working remotely**. Alongside the designated beaches
-it also includes informal **shoreline street ends** and small waterfront parks
-(some with little info and no water-quality monitoring).
+A tiny static site that maps **swim beaches, waterfront parks, and remote-work
+spots** across the greater Puget Sound area — paired so you can find a good place
+to work (cafe wifi or a mobile hotspot + shade) next to somewhere to swim or
+hang out. Coverage spans **76 spots across 14 areas**: all around Lake
+Washington (Seattle, the Eastside, Renton, Mercer Island), Lake Union, Green
+Lake, West Seattle, Ballard/Shilshole, Magnolia, the downtown Elliott Bay
+waterfront, Lake Sammamish + the I‑90 corridor (incl. Rattlesnake Lake and
+Snoqualmie River spots), South King County, north to Edmonds, south to Burien,
+and down to Tacoma. It also includes informal **shoreline street ends** and
+small waterfront parks (some with little info and no water-quality monitoring).
+
+Every spot is tagged with what it's **good for — 🏊 Swim / 🌳 Play / 💻 Work** —
+and you can filter to any of those.
 
 Each person signs in with a local profile and can:
 
@@ -12,13 +20,17 @@ Each person signs in with a local profile and can:
 - ⭐ **Rate** each spot (0–5)
 - 📝 **Leave comments / notes** (wifi, outlets, shade, swim quality…)
 - 👀 **Toggle on other people's comments** to see what everyone else thinks
-- 🗺️ **Browse a map** (List/Map toggle) with markers color-coded by swim type
+- 🔎 **Filter by category** (All / Swim / Play / Work) and by area
+- 🗺️ **Browse a map** (List/Map toggle) with markers color-coded by swim type;
+  a recommendation's **Map** button zooms right in on that spot
 - 🧭 **Find the nearest swim** from any park, cafe, or address — type a location,
   use your current location, or click the map; it ranks swimmable spots by a blend
   of distance and community rating
-- 💧 **See live freshwater quality** — monitored Lake Washington + Green Lake
-  beaches show a color-coded bacteria advisory, water temp, and sample date from
-  King County; saltwater/unmonitored spots are clearly labeled "Not monitored"
+- 💧 **See live freshwater quality** — monitored King County lake beaches show a
+  color-coded bacteria advisory, water temp, and sample date; saltwater, river,
+  and out-of-county (Snohomish/Pierce) spots are clearly labeled "Not monitored"
+- 📱 **Install to a home screen** — a web manifest + maskable icon make it work
+  as an add-to-home-screen shortcut on Android/iOS
 
 Comments sync through a small **Cloudflare Worker + D1** backend (the Worker also
 serves the static front-end via Workers static assets). If the backend isn't
@@ -37,6 +49,10 @@ public/               # static front-end (served as Workers assets)
   app.js              #   browser wiring (rendering + cloud/local store)
   logic.js            #   pure, testable logic (shared with tests)
   data/spots.js       #   the curated list of spots
+  icon.svg            #   app icon (browser tab + manifest)
+  icon-192/512.png    #   maskable PNG icons (home-screen shortcut)
+  apple-touch-icon.png
+  manifest.webmanifest#   PWA manifest (name, theme, icons)
 src/index.mjs         # Cloudflare Worker: /api/entries (D1) + /api/geocode + /api/water + static assets
 schema.sql            # D1 table definition
 wrangler.toml         # Cloudflare config (Worker entry, assets, D1 binding)
@@ -182,13 +198,16 @@ The Worker (`src/index.mjs`) exposes:
   identity from the verified Access JWT (`Cf-Access-Jwt-Assertion` /
   `cf-access-authenticated-user-email`) instead of trusting the client.
 - [~] **See/track water quality per location.**
-  - [x] **Freshwater (Lake Washington + Green Lake) — done.** Each monitored
-    beach has a `kcBeach` name mapping it to King County Swim Beach open data
-    (Socrata `mbzm-4r9y.json`, JSON, no key; E. coli geomean + temp; weekly,
-    ~mid-May→mid-Sep). The Worker proxies + caches it at `/api/water` and the
-    card/map chips show a color-coded advisory + water temp + sample date.
-    Swimmable saltwater + unmonitored spots render a muted "Not monitored" chip.
-  - [ ] **Saltwater (Alki + West Seattle).** WA Dept. of Ecology's BEACH program
+  - [x] **Freshwater (all King County monitored beaches) — done.** All **30**
+    King County swim-beach monitoring sites now have a `kcBeach` name mapping them
+    to the open data (Socrata `mbzm-4r9y.json`, JSON, no key; E. coli geomean +
+    temp; weekly, ~mid-May→mid-Sep) — from Seattle lakes out to Bellevue,
+    Kirkland, Mercer Island, Renton, Lake Sammamish, Rattlesnake Lake, and South
+    King County. The Worker proxies + caches it at `/api/water` and the card/map
+    chips show a color-coded advisory + water temp + sample date. Swimmable
+    saltwater, river, and out-of-county spots render a muted "Not monitored" chip.
+  - [ ] **Saltwater + other counties (Alki, Edmonds, Burien, Tacoma).** WA Dept.
+    of Ecology's BEACH program
     Coastal Atlas ArcGIS layer (`gis.ecology.wa.gov/.../MapServer/888`) currently
     **403s** programmatic access (Azure gateway), so there's no live saltwater feed
     yet. Options: revisit with an Ecology-approved endpoint/token, or fall back to
@@ -205,7 +224,12 @@ The Worker (`src/index.mjs`) exposes:
    Leaflet + OpenStreetMap map (no API key) with markers color-coded by swim
    type (visited spots get a gold ring). A List/Map toggle switches views, a
    legend explains the colors, and a marker popup's "View details" button jumps
-   to that spot's card.
+   to that spot's card. A recommendation's **Map** button flies in on that spot
+   (zoom 15) and opens its popup.
+   - [x] **Swim / Play / Work categories.** Every spot carries a `goodFor` set
+     (derived when omitted) and the toolbar has an **All / Swim / Play / Work**
+     filter; non-swim "park + work" spots (e.g. Olympic Sculpture Park, Bellevue
+     Downtown Park, Ruston Way) are included alongside swim beaches.
 2. [ ] **Live conditions per spot.** Pull current/forecast weather, air temp, UV
    index, and (where available) water temperature, plus today's sunrise/sunset,
    so you can decide *when* to go — not just *where*.
@@ -228,8 +252,10 @@ The Worker (`src/index.mjs`) exposes:
 8. [ ] **Day-planner / itinerary builder.** Pair a swim spot with a nearby work
    cafe into a saveable, shareable plan, including a one-tap multi-stop Google
    Maps route.
-9. [ ] **PWA + offline support.** Make it installable with a service worker so the
-   spot list, your notes, and cached conditions work at the beach on weak signal.
+9. [~] **PWA + offline support.** ✅ Installable: a web manifest + maskable app
+   icon (`icon.svg` + 192/512 PNGs) give it a proper add-to-home-screen shortcut
+   and theme color. Still to do: a service worker so the spot list, your notes,
+   and cached conditions work at the beach on weak signal.
 10. [ ] **Comment interactions & moderation.** Add reactions/upvotes and threaded
     replies to notes, plus an edit/delete-own and report/hide control (pairs with
     the Cloudflare Access auth item above for trustworthy identity).
@@ -238,10 +264,13 @@ The Worker (`src/index.mjs`) exposes:
 
 ## Notes on the data
 
-Seattle Parks runs **free lifeguarded beaches** (Lake Washington + Green Lake)
-roughly **late June – early September** (2026: ~Jun 27 – Sep 7). Puget Sound
-spots (Alki, Golden Gardens, Discovery Park, West Seattle shoreline) stay **cold
-year-round (~46–56°F)**.
+King County parks run **free lifeguarded lake beaches** roughly **late June –
+early September** (2026: ~Jun 27 – Sep 7). Puget Sound saltwater spots (Alki,
+Golden Gardens, Discovery Park, Richmond Beach, Edmonds, Seahurst, Owen/Titlow
+in Tacoma) and river spots (Snoqualmie, Rattlesnake Lake) stay **cold
+year-round (~46–56°F)** and have **no lifeguards**. Spots outside King County
+(Edmonds in Snohomish; Tacoma/Lakewood in Pierce) and all saltwater/river spots
+have **no live water-quality feed** and show **"Not monitored"**.
 
 **Central Lake Union** (Gas Works, the park, Westward) has **no legal swimming**
 (hazardous sediment / spraypark only) and is labeled accordingly. The **Eastlake /

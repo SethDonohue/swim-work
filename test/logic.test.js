@@ -131,6 +131,46 @@ test('spotMatchesFilters handles area, swimmable, and text query', () => {
   assert.equal(Logic.spotMatchesFilters(viewOnly, { swimmableOnly: true }), false);
 });
 
+test('spotGoodFor derives swim/play/work and honors explicit goodFor', () => {
+  assert.deepEqual(
+    Logic.spotGoodFor({ swimType: 'Lifeguarded beach', tags: ['wifi-cafe'] }).sort(),
+    ['play', 'swim', 'work']
+  );
+  assert.deepEqual(
+    Logic.spotGoodFor({ swimType: 'Beach (no lifeguard)', tags: [] }).sort(),
+    ['play', 'swim']
+  );
+  // A no-swimming "work-with-a-view" stop is play + work.
+  assert.deepEqual(Logic.spotGoodFor({ swimType: 'No swimming' }).sort(), ['play', 'work']);
+  // Explicit goodFor wins and is filtered down to valid categories.
+  assert.deepEqual(
+    Logic.spotGoodFor({ swimType: 'Lifeguarded beach', goodFor: ['work', 'bogus'] }),
+    ['work']
+  );
+});
+
+test('isSwimmable respects explicit goodFor over swimType', () => {
+  assert.equal(Logic.isSwimmable({ swimType: 'No swimming', goodFor: ['play', 'work'] }), false);
+  assert.equal(
+    Logic.isSwimmable({ swimType: 'Lifeguarded beach', goodFor: ['play', 'work'] }),
+    false,
+    'explicit goodFor without swim overrides a swimmable swimType'
+  );
+});
+
+test('spotMatchesFilters supports the category filter (all/swim/play/work)', () => {
+  const swimWork = { area: 'Eastside', swimType: 'Lifeguarded beach', tags: ['wifi-cafe'] };
+  const workPark = { area: 'Eastside', swimType: 'No swimming', goodFor: ['play', 'work'] };
+  assert.equal(Logic.spotMatchesFilters(swimWork, { category: 'all' }), true);
+  assert.equal(Logic.spotMatchesFilters(swimWork, { category: 'swim' }), true);
+  assert.equal(Logic.spotMatchesFilters(swimWork, { category: 'work' }), true);
+  assert.equal(Logic.spotMatchesFilters(workPark, { category: 'swim' }), false);
+  assert.equal(Logic.spotMatchesFilters(workPark, { category: 'play' }), true);
+  assert.equal(Logic.spotMatchesFilters(workPark, { category: 'work' }), true);
+  // Legacy swimmableOnly still maps to the swim category.
+  assert.equal(Logic.spotMatchesFilters(workPark, { swimmableOnly: true }), false);
+});
+
 test('myEntry / upsertEntry round-trip by (spotId, authorId)', () => {
   let entries = [];
   const a = { spotId: 's1', authorId: 'me', visited: true, rating: 4, comment: 'hi' };

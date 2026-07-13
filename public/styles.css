@@ -258,13 +258,28 @@ input {
   outline: 2px solid color-mix(in srgb, var(--primary) 55%, transparent);
   border-color: var(--primary);
 }
-.filters__check {
+.catfilter {
   display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.88rem;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.catfilter__btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
   color: var(--text-soft);
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
   cursor: pointer;
+}
+.catfilter__btn:hover {
+  border-color: var(--primary);
+}
+.catfilter__btn.is-active {
+  background: var(--primary);
+  color: var(--primary-ink);
+  border-color: var(--primary);
 }
 .area-tabs {
   display: flex;
@@ -598,6 +613,11 @@ input {
   border-style: dashed;
   background: var(--surface-2);
   color: var(--text-soft);
+}
+.badge--work-ok {
+  border-color: #6b52c9;
+  color: #6b52c9;
+  background: color-mix(in srgb, #6b52c9 14%, transparent);
 }
 
 .detail {

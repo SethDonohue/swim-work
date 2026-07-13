@@ -26,7 +26,7 @@
       showOthers: false,
       area: 'All',
       query: '',
-      swimmableOnly: false,
+      category: 'all', // 'all' | 'swim' | 'play' | 'work'
       view: 'list',
       origin: null, // { lat, lng, label } for the "nearest swim" finder
     },
@@ -35,6 +35,8 @@
   // Leaflet map handles (created lazily the first time the map view is shown).
   let map = null;
   let markersLayer = null;
+  let markersById = {}; // spotId -> Leaflet marker (rebuilt each map render)
+  let pendingFocusId = null; // spot to zoom to on the next map render
 
   // ---------------------------------------------------------------------------
   // Tiny DOM helpers (textContent-first to avoid XSS from user comments).
@@ -363,6 +365,9 @@
     ];
     const wq = waterChip(spot);
     if (wq) badges.push(wq);
+    if (Logic.spotGoodFor(spot).indexOf('work') !== -1) {
+      badges.push(el('span', { class: 'badge badge--work-ok', text: '💻 Work-friendly' }));
+    }
     card.appendChild(el('div', { class: 'badges' }, badges));
 
     card.appendChild(detailRow('🏊', 'Swim', spot.swim));
@@ -547,7 +552,7 @@
               class: 'btn btn--ghost rec__btn',
               type: 'button',
               text: 'Map',
-              onclick: () => setView('map'),
+              onclick: () => jumpToMap(r.spot.id),
             }),
           ]),
         ])
@@ -622,6 +627,7 @@
     if (!ensureMap()) return;
     $('#map-fallback').hidden = true;
     markersLayer.clearLayers();
+    markersById = {};
 
     const origin = state.prefs.origin;
     const recs =
@@ -645,6 +651,7 @@
       });
       marker.bindPopup(buildPopup(spot));
       markersLayer.addLayer(marker);
+      markersById[spot.id] = marker;
       points.push([spot.lat, spot.lng]);
     }
 
@@ -673,11 +680,23 @@
       points.push(o);
     }
 
-    if (points.length) {
-      map.fitBounds(points, { padding: [34, 34], maxZoom: 14 });
-    }
-    // The container may have just been un-hidden, so its size needs recomputing.
-    setTimeout(() => map.invalidateSize(), 0);
+    // Focusing a single spot (from a recommendation's "Map" button) zooms in
+    // instead of fitting all markers; otherwise fit everything in view.
+    const focusSpot = pendingFocusId ? SPOTS.find((s) => s.id === pendingFocusId) : null;
+    const focusMarker = pendingFocusId ? markersById[pendingFocusId] : null;
+    pendingFocusId = null;
+
+    // The container may have just been un-hidden, so its size needs recomputing
+    // before any setView/fitBounds so the math uses the real dimensions.
+    setTimeout(() => {
+      map.invalidateSize();
+      if (focusSpot && Logic.hasCoords(focusSpot)) {
+        map.flyTo([focusSpot.lat, focusSpot.lng], 15, { duration: 0.6 });
+        if (focusMarker) focusMarker.openPopup();
+      } else if (points.length) {
+        map.fitBounds(points, { padding: [34, 34], maxZoom: 14 });
+      }
+    }, 0);
 
     renderLegend();
   }
@@ -713,6 +732,12 @@
     setTimeout(() => card.classList.remove('is-flash'), 1700);
   }
 
+  // Switch to the map and zoom in on a single spot (from a recommendation).
+  function jumpToMap(spotId) {
+    pendingFocusId = spotId;
+    setView('map');
+  }
+
   function syncViewToggle() {
     const mapView = state.prefs.view === 'map';
     const listBtn = $('#view-list');
@@ -721,6 +746,15 @@
     mapBtn.classList.toggle('is-active', mapView);
     listBtn.setAttribute('aria-pressed', String(!mapView));
     mapBtn.setAttribute('aria-pressed', String(mapView));
+  }
+
+  function syncCategoryButtons() {
+    const active = state.prefs.category || 'all';
+    document.querySelectorAll('.catfilter__btn').forEach((btn) => {
+      const on = btn.dataset.cat === active;
+      btn.classList.toggle('is-active', on);
+      btn.setAttribute('aria-pressed', String(on));
+    });
   }
 
   function setView(view) {
@@ -806,10 +840,13 @@
       render();
     });
 
-    $('#swimmable-only').addEventListener('change', (e) => {
-      state.prefs.swimmableOnly = e.target.checked;
-      savePrefs();
-      render();
+    document.querySelectorAll('.catfilter__btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.prefs.category = btn.dataset.cat || 'all';
+        savePrefs();
+        syncCategoryButtons();
+        render();
+      });
     });
 
     $('#toggle-others').addEventListener('change', (e) => {
@@ -872,13 +909,19 @@
     state.prefs = Object.assign(state.prefs, readJSON(PREFS_KEY, {}));
     state.profile = readJSON(PROFILE_KEY, null);
 
+    // Migrate the legacy "swimmable only" flag to the new category filter.
+    if (!state.prefs.category) {
+      state.prefs.category = state.prefs.swimmableOnly ? 'swim' : 'all';
+    }
+    delete state.prefs.swimmableOnly;
+
     bindControls();
 
     // Reflect persisted prefs into the static controls.
     $('#search').value = state.prefs.query || '';
-    $('#swimmable-only').checked = !!state.prefs.swimmableOnly;
     $('#toggle-others').checked = !!state.prefs.showOthers;
     syncViewToggle();
+    syncCategoryButtons();
 
     if (state.profile && state.profile.id) {
       startSession(state.profile);

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Swim, Play and Work">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#12b0b6"/>
+      <stop offset="1" stop-color="#0b6fb0"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="512" height="512" rx="104" fill="url(#bg)"/>
+  <!-- sun: the "play"/outdoors note -->
+  <circle cx="378" cy="120" r="44" fill="#ffd24d"/>
+  <!-- laptop: the "work" note -->
+  <rect x="181" y="150" width="150" height="98" rx="12" fill="#ffffff"/>
+  <rect x="193" y="162" width="126" height="74" rx="6" fill="#0b6fb0"/>
+  <path d="M150 258 h212 l20 26 H130 Z" fill="#ffffff"/>
+  <!-- waves: the "swim" note -->
+  <path d="M36 372 q40 -28 80 0 t80 0 t80 0 t80 0 t80 0 t80 0" fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round" opacity="0.95"/>
+  <path d="M36 418 q40 -28 80 0 t80 0 t80 0 t80 0 t80 0 t80 0" fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round" opacity="0.7"/>
+</svg>
