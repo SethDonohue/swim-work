@@ -8,10 +8,14 @@
  *
  * GET    /api/entries            -> { entries: [...] }   (all authors, all spots)
  * GET    /api/entries?spotId=ID  -> { entries: [...] }   (single spot)
- * PUT    /api/entries            -> upsert one entry (JSON body)
+ * PUT    /api/entries            -> upsert one entry (JSON body; note capped 250)
  * DELETE /api/entries?spotId=&authorId=  -> delete one entry
  * GET    /api/geocode?q=<place>  -> { result: { lat, lng, label } | null }
  * GET    /api/water              -> latest King County freshwater quality per beach
+ * GET    /api/spots?authorId=ID  -> { spots: [...] } (public + caller's private)
+ * POST   /api/spots              -> create a user spot (JSON body)
+ * PATCH  /api/spots/<id>         -> edit own spot (public is one-way permanent)
+ * DELETE /api/spots/<id>?authorId=ID -> delete own *private* spot only
  *
  * NOTE: there is no authentication yet — the author identity comes from the
  * client's local profile, so anyone could write as anyone. This is the
@@ -20,6 +24,23 @@
  */
 
 const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8' };
+
+// A note/comment is capped at 250 chars (one per user per spot; freely editable).
+// Not exported: the Workers runtime only allows function/handler named exports on
+// the entry module. Tests assert the cap via behavior.
+const NOTE_MAX = 250;
+
+// Categories a user-created spot can be "good for".
+const CATEGORIES = ['swim', 'play', 'work'];
+const SWIM_TYPES = [
+  'Lifeguarded beach',
+  'Heated pool',
+  'Saltwater beach',
+  'Beach (no lifeguard)',
+  'Shoreline access',
+  'Tide pools',
+  'No swimming',
+];
 
 // Identifies this app to Nominatim per their usage policy (a real UA is required).
 const GEOCODER_UA =
@@ -54,6 +75,94 @@ export function toNum(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Normalize a goodFor value (array or CSV string) to a clean subset of CATEGORIES. */
+export function normalizeGoodFor(value) {
+  const arr = Array.isArray(value) ? value : String(value || '').split(',');
+  const out = [];
+  for (const raw of arr) {
+    const g = String(raw).trim().toLowerCase();
+    if (CATEGORIES.indexOf(g) !== -1 && out.indexOf(g) === -1) out.push(g);
+  }
+  return out.length ? out : ['play'];
+}
+
+/** Map a DB user_spots row to the client spot shape (merges with curated spots). */
+export function rowToUserSpot(row) {
+  const goodFor = normalizeGoodFor(row.good_for);
+  return {
+    id: row.id,
+    name: row.name,
+    area: row.area || 'Community spots',
+    address: row.address || '',
+    lat: Number(row.lat),
+    lng: Number(row.lng),
+    swimType: row.swim_type || 'Shoreline access',
+    water: row.water || 'Fresh',
+    swim: row.description || '',
+    cafe: '',
+    shade: '',
+    goodFor,
+    tags: ['user-submitted'],
+    userSubmitted: true,
+    authorId: row.author_id,
+    authorName: row.author_name,
+    isPublic: !!row.is_public,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/**
+ * Validate + normalize an incoming user-spot payload. Returns { spot } on success
+ * or { error } with a message. `partial` allows a subset of fields (for PATCH).
+ */
+export function sanitizeUserSpot(body, { partial = false } = {}) {
+  const out = {};
+  const has = (k) => body[k] !== undefined && body[k] !== null;
+
+  if (!partial || has('name')) {
+    const name = String(body.name || '').trim();
+    if (!name) return { error: 'name is required' };
+    out.name = name.slice(0, 120);
+  }
+  if (!partial || has('lat') || has('lng')) {
+    const lat = Number(body.lat);
+    const lng = Number(body.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return { error: 'valid lat/lng are required' };
+    }
+    if (lat < 47.05 || lat > 47.95 || lng < -122.75 || lng > -121.3) {
+      return { error: 'lat/lng outside the coverage area' };
+    }
+    out.lat = lat;
+    out.lng = lng;
+  }
+  if (has('goodFor') || has('good_for')) {
+    out.good_for = normalizeGoodFor(body.goodFor !== undefined ? body.goodFor : body.good_for).join(',');
+  }
+  if (has('swimType') || has('swim_type')) {
+    const st = String(body.swimType || body.swim_type);
+    out.swim_type = SWIM_TYPES.indexOf(st) !== -1 ? st : 'Shoreline access';
+  }
+  if (has('water')) out.water = body.water === 'Salt' ? 'Salt' : 'Fresh';
+  if (!partial || has('description')) {
+    out.description = String(body.description || '').slice(0, 400);
+  }
+  if (!partial || has('area')) out.area = String(body.area || 'Community spots').slice(0, 60) || 'Community spots';
+  if (has('address')) out.address = String(body.address || '').slice(0, 160);
+
+  // Keep swimType consistent with the chosen categories.
+  const goodFor = out.good_for ? out.good_for.split(',') : null;
+  if (goodFor) {
+    if (goodFor.indexOf('swim') === -1) {
+      out.swim_type = 'No swimming';
+    } else if (out.swim_type === 'No swimming' || (!out.swim_type && !partial)) {
+      out.swim_type = 'Shoreline access';
+    }
+  }
+  return { spot: out };
+}
+
 async function getEntries(request, env) {
   const url = new URL(request.url);
   const spotId = url.searchParams.get('spotId');
@@ -84,7 +193,7 @@ async function putEntry(request, env) {
     author_name: String(body.authorName || 'Anonymous').slice(0, 60),
     visited: body.visited ? 1 : 0,
     rating: clampRating(body.rating),
-    comment: String(body.comment || '').slice(0, 2000),
+    comment: String(body.comment || '').slice(0, NOTE_MAX),
     updated_at: new Date().toISOString(),
   };
 
@@ -123,6 +232,154 @@ async function deleteEntry(request, env) {
     .bind(spotId, authorId)
     .run();
   return json({ ok: true });
+}
+
+// ---------------------------------------------------------------------------
+// User-created spots (/api/spots)
+// ---------------------------------------------------------------------------
+
+/** Public spots (everyone) + the caller's own private spots. */
+async function getSpots(request, env) {
+  const url = new URL(request.url);
+  const authorId = (url.searchParams.get('authorId') || '').trim();
+  const stmt = authorId
+    ? env.DB.prepare(
+        'SELECT * FROM user_spots WHERE is_public = 1 OR author_id = ? ORDER BY created_at DESC'
+      ).bind(authorId)
+    : env.DB.prepare('SELECT * FROM user_spots WHERE is_public = 1 ORDER BY created_at DESC');
+  const { results } = await stmt.all();
+  return json({ spots: (results || []).map(rowToUserSpot) });
+}
+
+async function postSpot(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (_) {
+    return json({ error: 'Invalid JSON body' }, 400);
+  }
+  const authorId = String(body.authorId || '').trim();
+  if (!authorId) return json({ error: 'authorId is required' }, 400);
+
+  const { spot, error } = sanitizeUserSpot(body, { partial: false });
+  if (error) return json({ error }, 400);
+
+  const now = new Date().toISOString();
+  const row = {
+    id: 'user-' + (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`),
+    name: spot.name,
+    area: spot.area || 'Community spots',
+    address: spot.address || '',
+    lat: spot.lat,
+    lng: spot.lng,
+    swim_type: spot.swim_type || 'Shoreline access',
+    water: spot.water || 'Fresh',
+    good_for: spot.good_for || 'play',
+    description: spot.description || '',
+    author_id: authorId,
+    author_name: String(body.authorName || 'Anonymous').slice(0, 60),
+    is_public: body.isPublic ? 1 : 0,
+    created_at: now,
+    updated_at: now,
+  };
+
+  await env.DB.prepare(
+    `INSERT INTO user_spots
+       (id, name, area, address, lat, lng, swim_type, water, good_for, description,
+        author_id, author_name, is_public, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  )
+    .bind(
+      row.id, row.name, row.area, row.address, row.lat, row.lng, row.swim_type,
+      row.water, row.good_for, row.description, row.author_id, row.author_name,
+      row.is_public, row.created_at, row.updated_at
+    )
+    .run();
+
+  return json({ spot: rowToUserSpot(row) }, 201);
+}
+
+async function patchSpot(request, env, id) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (_) {
+    return json({ error: 'Invalid JSON body' }, 400);
+  }
+  const authorId = String(body.authorId || '').trim();
+  if (!authorId) return json({ error: 'authorId is required' }, 400);
+
+  const existing = await env.DB.prepare('SELECT * FROM user_spots WHERE id = ?').bind(id).first();
+  if (!existing) return json({ error: 'Spot not found' }, 404);
+  if (existing.author_id !== authorId) {
+    return json({ error: 'Only the author can edit this spot' }, 403);
+  }
+
+  const { spot, error } = sanitizeUserSpot(body, { partial: true });
+  if (error) return json({ error }, 400);
+
+  const next = {
+    name: spot.name !== undefined ? spot.name : existing.name,
+    area: spot.area !== undefined ? spot.area : existing.area,
+    address: spot.address !== undefined ? spot.address : existing.address,
+    lat: spot.lat !== undefined ? spot.lat : existing.lat,
+    lng: spot.lng !== undefined ? spot.lng : existing.lng,
+    swim_type: spot.swim_type !== undefined ? spot.swim_type : existing.swim_type,
+    water: spot.water !== undefined ? spot.water : existing.water,
+    good_for: spot.good_for !== undefined ? spot.good_for : existing.good_for,
+    description: spot.description !== undefined ? spot.description : existing.description,
+    // Public is permanent: once true it can't be turned back off, only on.
+    is_public: existing.is_public ? 1 : body.isPublic ? 1 : 0,
+    updated_at: new Date().toISOString(),
+  };
+
+  await env.DB.prepare(
+    `UPDATE user_spots SET
+       name = ?, area = ?, address = ?, lat = ?, lng = ?, swim_type = ?, water = ?,
+       good_for = ?, description = ?, is_public = ?, updated_at = ?
+     WHERE id = ?`
+  )
+    .bind(
+      next.name, next.area, next.address, next.lat, next.lng, next.swim_type,
+      next.water, next.good_for, next.description, next.is_public, next.updated_at, id
+    )
+    .run();
+
+  return json({ spot: rowToUserSpot({ ...existing, ...next, id }) });
+}
+
+async function deleteSpot(request, env, id) {
+  const url = new URL(request.url);
+  const authorId = (url.searchParams.get('authorId') || '').trim();
+  if (!authorId) return json({ error: 'authorId query param is required' }, 400);
+
+  const existing = await env.DB.prepare('SELECT * FROM user_spots WHERE id = ?').bind(id).first();
+  if (!existing) return json({ error: 'Spot not found' }, 404);
+  if (existing.author_id !== authorId) {
+    return json({ error: 'Only the author can delete this spot' }, 403);
+  }
+  if (existing.is_public) {
+    return json({ error: 'Public spots are permanent and cannot be deleted' }, 403);
+  }
+  await env.DB.prepare('DELETE FROM user_spots WHERE id = ?').bind(id).run();
+  return json({ ok: true });
+}
+
+async function handleSpots(request, env) {
+  if (!env.DB) return json({ error: 'D1 binding "DB" is not configured' }, 500);
+  const url = new URL(request.url);
+  // /api/spots  or  /api/spots/<id>
+  const rest = url.pathname.slice('/api/spots'.length).replace(/^\/+/, '');
+  const id = rest ? decodeURIComponent(rest) : '';
+
+  if (!id) {
+    if (request.method === 'GET') return getSpots(request, env);
+    if (request.method === 'POST') return postSpot(request, env);
+    return json({ error: 'Method not allowed' }, 405);
+  }
+  if (request.method === 'PATCH') return patchSpot(request, env, id);
+  if (request.method === 'DELETE') return deleteSpot(request, env, id);
+  return json({ error: 'Method not allowed' }, 405);
 }
 
 /**
@@ -253,6 +510,14 @@ async function handleApi(request, env, ctx) {
   if (url.pathname === '/api/water') {
     if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
     return waterQuality(request, env, ctx);
+  }
+
+  if (url.pathname === '/api/spots' || url.pathname.startsWith('/api/spots/')) {
+    try {
+      return await handleSpots(request, env);
+    } catch (err) {
+      return json({ error: String(err && err.message ? err.message : err) }, 500);
+    }
   }
 
   if (url.pathname !== '/api/entries') {

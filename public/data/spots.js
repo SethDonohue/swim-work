@@ -1229,6 +1229,19 @@ const SPOTS = [
   },
 ];
 
+// Append the generated SDOT shoreline street ends (see scripts/gen-street-ends.mjs).
+// Browser: data/street-ends.js loads first and defines the global STREET_END_SPOTS.
+// Node: require it here. Deduped against the curated spots above at generation time.
+(function () {
+  var extra =
+    typeof STREET_END_SPOTS !== 'undefined'
+      ? STREET_END_SPOTS
+      : typeof require !== 'undefined'
+      ? require('./street-ends.js')
+      : [];
+  for (var i = 0; i < extra.length; i++) SPOTS.push(extra[i]);
+})();
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = SPOTS;
 }

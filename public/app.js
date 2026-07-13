@@ -13,13 +13,16 @@
 
   const PROFILE_KEY = 'swimwork.profile';
   const ENTRIES_CACHE_KEY = 'swimwork.entries';
+  const USERSPOTS_CACHE_KEY = 'swimwork.userspots';
   const PREFS_KEY = 'swimwork.prefs';
   const THEME_KEY = 'swimwork.theme';
   const API_URL = '/api/entries';
+  const SPOTS_URL = '/api/spots';
 
   const state = {
     profile: null,
     entries: [],
+    userSpots: [], // community + own spots from /api/spots
     water: null, // { source, updated, beaches: { name: {...} } } from /api/water
     mode: 'local', // 'cloud' | 'local'
     prefs: {
@@ -32,12 +35,26 @@
     },
   };
 
+  // Curated spots (global SPOTS) + community spots, merged for every view.
+  function allSpots() {
+    return SPOTS.concat(state.userSpots || []);
+  }
+
+  function findSpot(id) {
+    return allSpots().find((s) => s.id === id) || null;
+  }
+
   // Leaflet map handles (created lazily the first time the map view is shown).
   let map = null;
   let markersLayer = null;
   let markersById = {}; // spotId -> Leaflet marker (rebuilt each map render)
   let pendingFocusId = null; // spot to zoom to on the next map render
   let preserveMapView = false; // when true, the next map render keeps the current center/zoom
+
+  // Add/edit-spot modal state.
+  let editingSpotId = null; // null = creating a new spot
+  let draftLocation = null; // { lat, lng, label } chosen in the spot form
+  let pickingLocation = false; // a map click sets the draft location, not the finder origin
 
   // ---------------------------------------------------------------------------
   // Tiny DOM helpers (textContent-first to avoid XSS from user comments).
@@ -100,6 +117,24 @@
     updateSyncPill();
   }
 
+  // Community + own spots. Public spots are visible to everyone; private ones
+  // only to their author. Falls back to a local cache so the map still shows
+  // your own spots offline.
+  async function loadUserSpots() {
+    const authorId = state.profile ? state.profile.id : '';
+    try {
+      const res = await fetch(`${SPOTS_URL}?authorId=${encodeURIComponent(authorId)}`, {
+        headers: { accept: 'application/json' },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      state.userSpots = Array.isArray(data.spots) ? data.spots : [];
+      writeJSON(USERSPOTS_CACHE_KEY, state.userSpots);
+    } catch (_) {
+      state.userSpots = readJSON(USERSPOTS_CACHE_KEY, []);
+    }
+  }
+
   // Live freshwater quality (King County). Best-effort: if it fails, the
   // chips just don't appear — the rest of the app is unaffected.
   async function loadWater() {
@@ -136,6 +171,42 @@
       }
       return false;
     }
+  }
+
+  // --- user-spot create / edit / delete -------------------------------------
+  async function createUserSpot(payload) {
+    const res = await fetch(SPOTS_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(Object.assign({ authorId: state.profile.id, authorName: state.profile.name }, payload)),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    state.userSpots = [data.spot].concat(state.userSpots);
+    writeJSON(USERSPOTS_CACHE_KEY, state.userSpots);
+    return data.spot;
+  }
+
+  async function updateUserSpot(id, payload) {
+    const res = await fetch(`${SPOTS_URL}/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(Object.assign({ authorId: state.profile.id }, payload)),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    state.userSpots = state.userSpots.map((s) => (s.id === id ? data.spot : s));
+    writeJSON(USERSPOTS_CACHE_KEY, state.userSpots);
+    return data.spot;
+  }
+
+  async function deleteUserSpot(id) {
+    const url = `${SPOTS_URL}/${encodeURIComponent(id)}?authorId=${encodeURIComponent(state.profile.id)}`;
+    const res = await fetch(url, { method: 'DELETE' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    state.userSpots = state.userSpots.filter((s) => s.id !== id);
+    writeJSON(USERSPOTS_CACHE_KEY, state.userSpots);
   }
 
   async function removeEntry(spotId, authorId) {
@@ -175,7 +246,7 @@
     $('#login').hidden = true;
     $('#app').hidden = false;
     $('#profile-name').textContent = profile.name;
-    await loadEntries();
+    await Promise.all([loadEntries(), loadUserSpots()]);
     render();
     // Fetch water quality in the background; re-render to show chips when ready.
     loadWater().then(() => render());
@@ -216,7 +287,7 @@
   function renderAreaTabs() {
     const tabs = $('#area-tabs');
     tabs.textContent = '';
-    const areas = ['All'].concat(Logic.areaList(SPOTS));
+    const areas = ['All'].concat(Logic.areaList(allSpots()));
     for (const area of areas) {
       const btn = el('button', {
         class: 'area-tab' + (state.prefs.area === area ? ' is-active' : ''),
@@ -369,11 +440,20 @@
     if (Logic.spotGoodFor(spot).indexOf('work') !== -1) {
       badges.push(el('span', { class: 'badge badge--work-ok', text: '💻 Work-friendly' }));
     }
+    if (Logic.isUserSubmitted(spot)) {
+      badges.push(el('span', { class: 'badge badge--community', text: '👥 Community' }));
+      badges.push(
+        el('span', {
+          class: 'badge ' + (spot.isPublic ? 'badge--public' : 'badge--private'),
+          text: spot.isPublic ? 'Public' : 'Private (only you)',
+        })
+      );
+    }
     card.appendChild(el('div', { class: 'badges' }, badges));
 
-    card.appendChild(detailRow('🏊', 'Swim', spot.swim));
-    card.appendChild(detailRow('☕', 'Work', spot.cafe));
-    card.appendChild(detailRow('🌳', 'Shade', spot.shade));
+    if (spot.swim) card.appendChild(detailRow('🏊', 'Swim', spot.swim));
+    if (spot.cafe) card.appendChild(detailRow('☕', 'Work', spot.cafe));
+    if (spot.shade) card.appendChild(detailRow('🌳', 'Shade', spot.shade));
 
     if (spot.tags && spot.tags.length) {
       card.appendChild(
@@ -381,15 +461,36 @@
       );
     }
 
-    card.appendChild(
+    const linkRow = el('div', { class: 'card__links' }, [
       el('a', {
         class: 'card__map',
         href: Logic.buildMapUrl(spot),
         target: '_blank',
         rel: 'noopener',
         text: '📍 Open in Maps',
-      })
-    );
+      }),
+    ]);
+    if (Logic.canEditSpot(spot, state.profile.id)) {
+      linkRow.appendChild(
+        el('button', {
+          class: 'btn btn--ghost card__owner-btn',
+          type: 'button',
+          text: '✏️ Edit',
+          onclick: () => openSpotModal(spot),
+        })
+      );
+      if (Logic.canDeleteSpot(spot, state.profile.id)) {
+        linkRow.appendChild(
+          el('button', {
+            class: 'btn btn--ghost card__owner-btn card__owner-btn--danger',
+            type: 'button',
+            text: '🗑 Delete',
+            onclick: () => confirmDeleteSpot(spot),
+          })
+        );
+      }
+    }
+    card.appendChild(linkRow);
 
     // ---- the user's own controls ----
     const visitedCheckbox = el('input', { type: 'checkbox' });
@@ -400,16 +501,22 @@
 
     const comment = el('textarea', {
       class: 'comment',
-      placeholder: 'Your notes — wifi? outlets? shade? worth a swim?',
-      maxlength: '2000',
+      placeholder: 'Your note — wifi? outlets? shade? worth a swim? (one per spot)',
+      maxlength: String(Logic.NOTE_MAX),
     });
     comment.value = mine && mine.comment ? mine.comment : '';
 
     const saveState = el('span', { class: 'save-state' });
+    const counter = el('span', { class: 'comment__count' });
+    const updateCount = () => {
+      counter.textContent = `${comment.value.length}/${Logic.NOTE_MAX}`;
+    };
+    updateCount();
 
     let commentTimer = null;
     comment.addEventListener('input', () => {
       saveState.textContent = 'Editing…';
+      updateCount();
       clearTimeout(commentTimer);
       commentTimer = setTimeout(() => saveField(spot, { comment: comment.value }, saveState), 700);
     });
@@ -424,7 +531,7 @@
         renderStars(spot, mine),
       ]),
       comment,
-      saveState,
+      el('div', { class: 'controls__foot' }, [saveState, counter]),
     ]);
     card.appendChild(controls);
 
@@ -444,7 +551,7 @@
 
   function render() {
     renderAreaTabs();
-    const filtered = SPOTS.filter((s) => Logic.spotMatchesFilters(s, state.prefs));
+    const filtered = allSpots().filter((s) => Logic.spotMatchesFilters(s, state.prefs));
     renderProgress(filtered);
 
     renderFinderResults();
@@ -535,7 +642,7 @@
       return;
     }
 
-    const recs = Logic.recommendSwimSpots(SPOTS, origin, state.entries, { limit: 3 });
+    const recs = Logic.recommendSwimSpots(allSpots(), origin, state.entries, { limit: 3 });
     box.textContent = '';
     box.appendChild(
       el('p', { class: 'finder__label' }, [
@@ -605,9 +712,18 @@
     markersLayer = L.layerGroup().addTo(map);
     // Click anywhere on the map to drop a start point for the finder; keep the
     // user's current zoom/center since they just pointed at where they want it.
-    map.on('click', (e) =>
-      setOrigin({ lat: e.latlng.lat, lng: e.latlng.lng, label: 'Picked point' }, { preserveView: true })
-    );
+    // When the add/edit-spot form is picking a location, set that instead.
+    map.on('click', (e) => {
+      const point = { lat: e.latlng.lat, lng: e.latlng.lng, label: 'Picked point' };
+      if (pickingLocation) {
+        pickingLocation = false;
+        setDraftLocation(point);
+        $('#finder-status').textContent = '';
+        $('#spot-modal').hidden = false; // reopen the form with the location filled in
+        return;
+      }
+      setOrigin(point, { preserveView: true });
+    });
     return map;
   }
 
@@ -661,7 +777,7 @@
     const origin = state.prefs.origin;
     const recs =
       origin && Logic.hasCoords(origin)
-        ? Logic.recommendSwimSpots(SPOTS, origin, state.entries, { limit: 3 })
+        ? Logic.recommendSwimSpots(allSpots(), origin, state.entries, { limit: 3 })
         : [];
     const recIds = new Set(recs.map((r) => r.spot.id));
 
@@ -712,7 +828,7 @@
     // Focusing a single spot (from a recommendation's "Map" button) zooms in
     // instead of fitting all markers; otherwise fit everything in view — unless
     // we're asked to preserve the current view (e.g. clearing the pin).
-    const focusSpot = pendingFocusId ? SPOTS.find((s) => s.id === pendingFocusId) : null;
+    const focusSpot = pendingFocusId ? findSpot(pendingFocusId) : null;
     const focusMarker = pendingFocusId ? markersById[pendingFocusId] : null;
     pendingFocusId = null;
     const preserveView = preserveMapView;
@@ -794,6 +910,123 @@
     savePrefs();
     syncViewToggle();
     render();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Add / edit a community spot
+  // ---------------------------------------------------------------------------
+  function setDraftLocation(loc) {
+    draftLocation = loc && Logic.hasCoords(loc) ? loc : null;
+    const status = $('#spot-loc-status');
+    if (draftLocation) {
+      const label = loc.label || `${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}`;
+      status.textContent = `📍 ${label}`;
+      status.classList.add('is-set');
+    } else {
+      status.textContent = 'No location set yet.';
+      status.classList.remove('is-set');
+    }
+  }
+
+  function spotFormError(msg) {
+    const p = $('#spot-form-error');
+    p.textContent = msg;
+    p.hidden = !msg;
+  }
+
+  function openSpotModal(spot) {
+    editingSpotId = spot ? spot.id : null;
+    const isEdit = !!spot;
+    $('#spot-modal-title').textContent = isEdit ? 'Edit spot' : 'Add a spot';
+    $('#spot-save').textContent = isEdit ? 'Save changes' : 'Save spot';
+    spotFormError('');
+
+    const cats = isEdit ? Logic.spotGoodFor(spot) : ['swim'];
+    $('#spot-name').value = isEdit ? spot.name : '';
+    $('#spot-cat-swim').checked = cats.indexOf('swim') !== -1;
+    $('#spot-cat-play').checked = cats.indexOf('play') !== -1;
+    $('#spot-cat-work').checked = cats.indexOf('work') !== -1;
+    $('#spot-swimtype').value = isEdit && spot.swimType ? spot.swimType : 'Shoreline access';
+    $('#spot-water').value = isEdit && spot.water === 'Salt' ? 'Salt' : 'Fresh';
+    $('#spot-desc').value = isEdit ? spot.swim || '' : '';
+    $('#spot-addr').value = '';
+
+    const pub = $('#spot-public');
+    pub.checked = isEdit ? !!spot.isPublic : false;
+    // Public is permanent — an already-public spot can't be turned back to private.
+    pub.disabled = isEdit && !!spot.isPublic;
+
+    const del = $('#spot-delete');
+    if (isEdit && Logic.canDeleteSpot(spot, state.profile.id)) {
+      del.hidden = false;
+      del.onclick = () => confirmDeleteSpot(spot);
+    } else {
+      del.hidden = true;
+      del.onclick = null;
+    }
+
+    if (isEdit) setDraftLocation({ lat: spot.lat, lng: spot.lng, label: spot.address || spot.name });
+    else setDraftLocation(state.prefs.origin ? Object.assign({}, state.prefs.origin) : null);
+
+    $('#spot-modal').hidden = false;
+    setTimeout(() => $('#spot-name').focus(), 30);
+  }
+
+  function closeSpotModal() {
+    $('#spot-modal').hidden = true;
+    pickingLocation = false;
+  }
+
+  async function submitSpotForm() {
+    const name = $('#spot-name').value.trim();
+    if (!name) return spotFormError('Please give the spot a name.');
+    if (!draftLocation) {
+      return spotFormError('Set a location — search an address, use my location, or pick on the map.');
+    }
+    const goodFor = [];
+    if ($('#spot-cat-swim').checked) goodFor.push('swim');
+    if ($('#spot-cat-play').checked) goodFor.push('play');
+    if ($('#spot-cat-work').checked) goodFor.push('work');
+    if (!goodFor.length) goodFor.push('play');
+
+    // Only keep a human place label as the address (not raw "lat, lng").
+    const label = draftLocation.label || '';
+    const payload = {
+      name,
+      description: $('#spot-desc').value.trim(),
+      goodFor,
+      swimType: $('#spot-swimtype').value,
+      water: $('#spot-water').value,
+      isPublic: $('#spot-public').checked,
+      lat: draftLocation.lat,
+      lng: draftLocation.lng,
+      address: /^-?\d+(\.\d+)?,/.test(label) ? '' : label,
+    };
+
+    $('#spot-save').disabled = true;
+    try {
+      const saved = editingSpotId
+        ? await updateUserSpot(editingSpotId, payload)
+        : await createUserSpot(payload);
+      closeSpotModal();
+      render();
+      if (saved && Logic.hasCoords(saved)) jumpToMap(saved.id);
+    } catch (err) {
+      spotFormError((err && err.message) || 'Could not save — the backend may be unavailable.');
+    } finally {
+      $('#spot-save').disabled = false;
+    }
+  }
+
+  async function confirmDeleteSpot(spot) {
+    if (!window.confirm(`Delete "${spot.name}"? This can't be undone.`)) return;
+    try {
+      await deleteUserSpot(spot.id);
+      closeSpotModal();
+      render();
+    } catch (err) {
+      window.alert((err && err.message) || 'Could not delete this spot.');
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -925,6 +1158,55 @@
     });
 
     $('#finder-clear').addEventListener('click', clearOrigin);
+
+    // --- add / edit community spot ---
+    $('#add-spot-fab').addEventListener('click', () => openSpotModal(null));
+    $('#spot-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      submitSpotForm();
+    });
+    document.querySelectorAll('#spot-modal [data-close]').forEach((btn) => {
+      btn.addEventListener('click', closeSpotModal);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !$('#spot-modal').hidden) closeSpotModal();
+    });
+
+    $('#spot-addr-btn').addEventListener('click', async () => {
+      const q = $('#spot-addr').value.trim();
+      if (!q) return;
+      const status = $('#spot-loc-status');
+      status.textContent = 'Searching…';
+      const r = await geocodeQuery(q);
+      if (r && Logic.hasCoords(r)) {
+        setDraftLocation({ lat: r.lat, lng: r.lng, label: r.label });
+      } else {
+        status.textContent = "Couldn't find that — try another address or pick on the map.";
+      }
+    });
+
+    $('#spot-geo').addEventListener('click', () => {
+      const status = $('#spot-loc-status');
+      if (!navigator.geolocation) {
+        status.textContent = 'Geolocation is not available in this browser.';
+        return;
+      }
+      status.textContent = 'Locating…';
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setDraftLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude, label: 'My location' }),
+        () => {
+          status.textContent = 'Could not get your location (permission denied?).';
+        },
+        { enableHighAccuracy: false, timeout: 8000 }
+      );
+    });
+
+    $('#spot-pick').addEventListener('click', () => {
+      $('#spot-modal').hidden = true; // hide without resetting pick mode
+      pickingLocation = true;
+      setView('map');
+      $('#finder-status').textContent = 'Tap the map to set your spot’s location…';
+    });
 
     $('#theme-btn').addEventListener('click', () => {
       const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';

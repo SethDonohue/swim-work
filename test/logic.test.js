@@ -15,6 +15,33 @@ test('isSwimmable distinguishes water access from view-only spots', () => {
   assert.equal(Logic.isSwimmable({ swimType: 'Tide pools' }), false);
 });
 
+test('user-submitted spot permission helpers', () => {
+  const mine = { userSubmitted: true, authorId: 'a1', isPublic: false };
+  const minePublic = { userSubmitted: true, authorId: 'a1', isPublic: true };
+  const theirs = { userSubmitted: true, authorId: 'a2', isPublic: false };
+  const curated = { swimType: 'Lifeguarded beach' };
+
+  assert.equal(Logic.isUserSubmitted(mine), true);
+  assert.equal(Logic.isUserSubmitted(curated), false);
+
+  // Author can edit their own spots (public or private); nobody edits curated/others.
+  assert.equal(Logic.canEditSpot(mine, 'a1'), true);
+  assert.equal(Logic.canEditSpot(minePublic, 'a1'), true);
+  assert.equal(Logic.canEditSpot(theirs, 'a1'), false);
+  assert.equal(Logic.canEditSpot(curated, 'a1'), false);
+
+  // Delete only own *private* spots — public spots are permanent.
+  assert.equal(Logic.canDeleteSpot(mine, 'a1'), true);
+  assert.equal(Logic.canDeleteSpot(minePublic, 'a1'), false);
+  assert.equal(Logic.canDeleteSpot(theirs, 'a1'), false);
+});
+
+test('normalizeEntry caps a note at NOTE_MAX (250) chars', () => {
+  const entry = Logic.normalizeEntry({ spotId: 's', authorId: 'a', comment: 'y'.repeat(600) });
+  assert.equal(entry.comment.length, Logic.NOTE_MAX);
+  assert.equal(Logic.NOTE_MAX, 250);
+});
+
 test('buildMapUrl encodes name + address', () => {
   const url = Logic.buildMapUrl({ name: 'Alki Beach', address: '1702 Alki Ave SW' });
   assert.match(url, /^https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=/);

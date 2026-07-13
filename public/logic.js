@@ -15,6 +15,30 @@ const Logic = {
   /** The three things a spot can be "good for" (drives the category filter). */
   CATEGORIES: ['swim', 'play', 'work'],
 
+  /** Max length of a per-user note/comment (one per user per spot). */
+  NOTE_MAX: 250,
+
+  /** True for a community-submitted (user-created) spot. */
+  isUserSubmitted(spot) {
+    return !!(spot && spot.userSubmitted);
+  },
+
+  /**
+   * Can `authorId` edit this spot? Only the author of a user-submitted spot.
+   * (Public spots stay editable by their author; curated spots are never editable.)
+   */
+  canEditSpot(spot, authorId) {
+    return Logic.isUserSubmitted(spot) && !!authorId && spot.authorId === authorId;
+  },
+
+  /**
+   * Can `authorId` delete this spot? Only the author, and only while it's still
+   * private — once a spot is made public it's permanent.
+   */
+  canDeleteSpot(spot, authorId) {
+    return Logic.canEditSpot(spot, authorId) && !spot.isPublic;
+  },
+
   /** Tags that mark a spot as remote-work friendly (cafe wifi / work stop). */
   WORK_TAGS: ['wifi-cafe', 'work-spot', 'lake-view-cafe'],
 
@@ -269,7 +293,7 @@ const Logic = {
       authorName: String(raw.authorName || 'Anonymous').slice(0, 60),
       visited: !!raw.visited,
       rating: Logic.coerceRating(raw.rating),
-      comment: String(raw.comment || '').slice(0, 2000),
+      comment: String(raw.comment || '').slice(0, Logic.NOTE_MAX),
       updatedAt: raw.updatedAt || new Date().toISOString(),
     };
     const isEmpty = !entry.visited && entry.rating === 0 && !entry.comment.trim();

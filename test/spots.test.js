@@ -19,7 +19,7 @@ test('dataset covers all requested areas', () => {
 });
 
 test('dataset has a healthy number of spots', () => {
-  assert.ok(SPOTS.length >= 60, `expected >=60 spots, got ${SPOTS.length}`);
+  assert.ok(SPOTS.length >= 150, `expected >=150 spots, got ${SPOTS.length}`);
 });
 
 test('dataset includes the expanded regional areas', () => {
@@ -65,6 +65,32 @@ test('Shoreline access spots are present, swimmable, and validate', () => {
     assert.ok(Logic.isSwimmable(spot), `${spot.id} should count as swimmable`);
     assert.match(Logic.swimTypeColor(spot.swimType), /^#[0-9a-f]{6}$/i);
   }
+});
+
+test('SDOT shoreline street ends are imported, tagged, and classified', () => {
+  const ends = SPOTS.filter((s) => (s.tags || []).includes('shoreline-street-end'));
+  // 143 city records minus a few deduped against curated spots.
+  assert.ok(ends.length >= 120, `expected >=120 street ends, got ${ends.length}`);
+
+  for (const s of ends) {
+    assert.deepEqual(Logic.validateSpots([s]), [], `${s.id} should validate`);
+    const notReady = (s.tags || []).includes('not-yet-accessible');
+    if (notReady) {
+      assert.equal(s.swimType, 'No swimming', `${s.id} not-yet-accessible => No swimming`);
+      assert.ok(!Logic.isSwimmable(s), `${s.id} not-yet-accessible must not be swimmable`);
+    }
+    if (s.swimType === 'Shoreline access') {
+      assert.ok(Logic.isSwimmable(s), `${s.id} shoreline access should be swimmable`);
+    }
+  }
+
+  // The city flags many sites as not yet open to visitors — surface them.
+  const notReady = ends.filter((s) => (s.tags || []).includes('not-yet-accessible'));
+  assert.ok(notReady.length >= 20, `expected >=20 not-yet-accessible ends, got ${notReady.length}`);
+
+  // Some are genuinely swimmable (sand/pebble beaches, kayak/boat launches).
+  const swimmable = ends.filter((s) => s.swimType === 'Shoreline access');
+  assert.ok(swimmable.length >= 10, `expected >=10 swimmable ends, got ${swimmable.length}`);
 });
 
 test('every spot produces a usable map URL', () => {

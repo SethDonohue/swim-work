@@ -619,6 +619,21 @@ input {
   color: #6b52c9;
   background: color-mix(in srgb, #6b52c9 14%, transparent);
 }
+.badge--community {
+  border-color: #c9527f;
+  color: #c9527f;
+  background: color-mix(in srgb, #c9527f 14%, transparent);
+}
+.badge--public {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.badge--private {
+  border-color: var(--border);
+  color: var(--text-soft);
+  background: var(--surface-2);
+}
 
 .detail {
   display: grid;
@@ -651,6 +666,12 @@ input {
   padding: 0.12rem 0.45rem;
 }
 
+.card__links {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
 .card__map {
   font-size: 0.85rem;
   color: var(--primary);
@@ -659,6 +680,16 @@ input {
 }
 .card__map:hover {
   text-decoration: underline;
+}
+.card__owner-btn {
+  font-size: 0.8rem;
+  padding: 0.3rem 0.55rem;
+}
+.card__owner-btn--danger {
+  color: var(--danger);
+}
+.card__owner-btn--danger:hover {
+  border-color: var(--danger);
 }
 
 /* ---------- Card controls (the user's own notes) ---------- */
@@ -726,10 +757,21 @@ input {
   outline: 2px solid color-mix(in srgb, var(--primary) 55%, transparent);
   border-color: var(--primary);
 }
+.controls__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
 .save-state {
   font-size: 0.75rem;
   color: var(--text-soft);
   min-height: 1rem;
+}
+.comment__count {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  white-space: nowrap;
 }
 
 /* ---------- Others' comments ---------- */
@@ -807,9 +849,179 @@ input {
   display: none !important;
 }
 
+/* ---------- Add-a-spot FAB ---------- */
+.fab {
+  position: fixed;
+  right: 1.1rem;
+  bottom: 1.1rem;
+  z-index: 900;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.7rem 1.05rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--primary-ink);
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+.fab span {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+.fab:active {
+  transform: translateY(1px);
+}
+
+/* ---------- Modal (add / edit spot) ---------- */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+.modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 16, 24, 0.55);
+}
+.modal__card {
+  position: relative;
+  width: min(560px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.1rem 1.2rem 1.3rem;
+}
+.modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+.modal__title {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.modal__x {
+  border: none;
+  background: none;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-soft);
+}
+.modal__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.modal__spacer {
+  flex: 1;
+}
+
+.spot-form {
+  display: grid;
+  gap: 0.75rem;
+}
+.field {
+  display: grid;
+  gap: 0.3rem;
+}
+.field__label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+.field__input {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+}
+.field__input:focus {
+  outline: 2px solid color-mix(in srgb, var(--primary) 55%, transparent);
+  border-color: var(--primary);
+}
+.spot-form__group {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.6rem 0.7rem;
+  margin: 0;
+}
+.spot-form__cats {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.chk {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.chk input {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--accent);
+}
+.chk--public {
+  align-items: flex-start;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  gap: 0.5rem;
+}
+.spot-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+.spot-loc__row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.spot-loc__row .field__input {
+  flex: 1;
+}
+.spot-loc__status {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+.spot-loc__status.is-set {
+  color: var(--accent);
+  font-weight: 600;
+}
+.spot-form__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+.spot-form__delete {
+  color: var(--danger);
+}
+.spot-form__delete:hover {
+  border-color: var(--danger);
+}
+
 @media (max-width: 560px) {
   .topbar__right {
     width: 100%;
     justify-content: space-between;
+  }
+  .spot-form__row {
+    grid-template-columns: 1fr;
   }
 }

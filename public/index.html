@@ -152,6 +152,10 @@
 
       <p id="empty" class="empty" hidden>No spots match your filters.</p>
 
+      <button id="add-spot-fab" class="fab" type="button" title="Add a spot">
+        <span aria-hidden="true">＋</span> Add a spot
+      </button>
+
       <footer class="footer">
         <p>
           Lifeguarded lake beaches (King County) run roughly
@@ -169,12 +173,97 @@
       </footer>
     </div>
 
+    <!-- Add / edit a community spot -->
+    <div id="spot-modal" class="modal" hidden>
+      <div class="modal__backdrop" data-close></div>
+      <div class="modal__card" role="dialog" aria-modal="true" aria-labelledby="spot-modal-title">
+        <div class="modal__head">
+          <h2 id="spot-modal-title" class="modal__title">Add a spot</h2>
+          <button id="spot-modal-close" class="modal__x" type="button" aria-label="Close" data-close>×</button>
+        </div>
+        <form id="spot-form" class="spot-form" autocomplete="off">
+          <label class="field">
+            <span class="field__label">Name</span>
+            <input id="spot-name" class="field__input" type="text" maxlength="120"
+              placeholder="e.g. Secret cove off Lake Washington Blvd" required />
+          </label>
+
+          <fieldset class="spot-form__group">
+            <legend class="field__label">Good for</legend>
+            <div class="spot-form__cats">
+              <label class="chk"><input type="checkbox" id="spot-cat-swim" value="swim" /> 🏊 Swim</label>
+              <label class="chk"><input type="checkbox" id="spot-cat-play" value="play" /> 🌳 Play</label>
+              <label class="chk"><input type="checkbox" id="spot-cat-work" value="work" /> 💻 Work</label>
+            </div>
+          </fieldset>
+
+          <div class="spot-form__row">
+            <label class="field">
+              <span class="field__label">Swim type</span>
+              <select id="spot-swimtype" class="field__input">
+                <option>Shoreline access</option>
+                <option>Beach (no lifeguard)</option>
+                <option>Saltwater beach</option>
+                <option>Lifeguarded beach</option>
+                <option>Heated pool</option>
+                <option>Tide pools</option>
+                <option>No swimming</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="field__label">Water</span>
+              <select id="spot-water" class="field__input">
+                <option value="Fresh">Fresh</option>
+                <option value="Salt">Salt</option>
+              </select>
+            </label>
+          </div>
+
+          <label class="field">
+            <span class="field__label">Description</span>
+            <textarea id="spot-desc" class="field__input" maxlength="400" rows="3"
+              placeholder="What makes it good? Access notes, wifi/outlets, shade…"></textarea>
+          </label>
+
+          <fieldset class="spot-form__group">
+            <legend class="field__label">Location</legend>
+            <div class="spot-loc__row">
+              <input id="spot-addr" class="field__input" type="text"
+                placeholder="Type an address or place, then Find" />
+              <button id="spot-addr-btn" class="btn" type="button">Find</button>
+            </div>
+            <div class="spot-loc__row">
+              <button id="spot-geo" class="btn" type="button">📍 My location</button>
+              <button id="spot-pick" class="btn" type="button">🗺 Pick on map</button>
+            </div>
+            <p id="spot-loc-status" class="spot-loc__status">No location set yet.</p>
+          </fieldset>
+
+          <label class="chk chk--public">
+            <input type="checkbox" id="spot-public" />
+            <span>Make it <b>public</b> — visible to everyone. Public spots are permanent
+              (they can be edited but not deleted). Private spots stay just yours.</span>
+          </label>
+
+          <p id="spot-form-error" class="spot-form__error" role="alert" hidden></p>
+
+          <div class="modal__actions">
+            <button id="spot-delete" class="btn btn--ghost spot-form__delete" type="button" hidden>🗑 Delete</button>
+            <span class="modal__spacer"></span>
+            <button type="button" class="btn btn--ghost" data-close>Cancel</button>
+            <button id="spot-save" type="submit" class="btn btn--primary">Save spot</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Order matters: Leaflet + data + logic load before the app wiring. -->
     <script
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
       integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
       crossorigin=""
     ></script>
+    <script src="data/street-ends.js"></script>
     <script src="data/spots.js"></script>
     <script src="logic.js"></script>
     <script src="app.js"></script>
