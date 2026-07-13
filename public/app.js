@@ -486,13 +486,33 @@
     }
   }
 
+  // Re-render without letting the page jump: the recommendations panel sits
+  // above the map, so adding/removing it shifts the map down/up. Pin the map's
+  // viewport position by scrolling to the offset that keeps its top constant.
+  // We derive the map's document offset as (rect.top + scrollY), which is
+  // invariant to the scroll clamping the browser applies when the page shrinks.
+  function renderKeepingMapStable() {
+    if (state.prefs.view !== 'map') {
+      render();
+      return;
+    }
+    const mapEl = $('#map-view');
+    const beforeTop = mapEl.getBoundingClientRect().top;
+    render();
+    // (rect.top + scrollY) is the map's document offset, invariant to the scroll
+    // clamping the browser applies when the page shrinks.
+    const docOffset = mapEl.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo({ top: Math.max(0, docOffset - beforeTop), behavior: 'auto' });
+  }
+
   function setOrigin(origin, { preserveView = false } = {}) {
     state.prefs.origin = origin;
     savePrefs();
     // A map click is already framed by the user, so keep their view; an address
     // search / geolocation fits the origin + recommendations into view instead.
     preserveMapView = preserveView;
-    render();
+    if (preserveView) renderKeepingMapStable();
+    else render();
   }
 
   function clearOrigin() {
@@ -501,7 +521,7 @@
     $('#finder-status').textContent = '';
     // Just drop the pin + recommendations; leave the map where the user has it.
     preserveMapView = true;
-    render();
+    renderKeepingMapStable();
   }
 
   function renderFinderResults() {
