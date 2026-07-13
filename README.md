@@ -3,13 +3,13 @@
 A tiny static site that maps **swim beaches, waterfront parks, and remote-work
 spots** across the greater Puget Sound area — paired so you can find a good place
 to work (cafe wifi or a mobile hotspot + shade) next to somewhere to swim or
-hang out. Coverage spans **76 spots across 14 areas**: all around Lake
-Washington (Seattle, the Eastside, Renton, Mercer Island), Lake Union, Green
-Lake, West Seattle, Ballard/Shilshole, Magnolia, the downtown Elliott Bay
-waterfront, Lake Sammamish + the I‑90 corridor (incl. Rattlesnake Lake and
-Snoqualmie River spots), South King County, north to Edmonds, south to Burien,
-and down to Tacoma. It also includes informal **shoreline street ends** and
-small waterfront parks (some with little info and no water-quality monitoring).
+hang out. Coverage spans **200+ spots** across Lake Washington (Seattle, the
+Eastside, Renton, Mercer Island), Lake Union, Green Lake, West Seattle,
+Ballard/Shilshole, Magnolia, the downtown Elliott Bay waterfront, Lake Sammamish
++ the I‑90 corridor (incl. Rattlesnake Lake and Snoqualmie River spots), South
+King County, north to Edmonds, south to Burien, and down to Tacoma. It also
+imports **every SDOT shoreline street end in Seattle** (auto-classified swim vs.
+view-only; sites not yet open are tagged), plus community spots added by users.
 
 Every spot is tagged with what it's **good for — 🏊 Swim / 🌳 Play / 💻 Work** —
 and you can filter to any of those.
@@ -18,8 +18,11 @@ Each person signs in with a local profile and can:
 
 - ✅ **Check off** spots they've visited
 - ⭐ **Rate** each spot (0–5)
-- 📝 **Leave comments / notes** (wifi, outlets, shade, swim quality…)
-- 👀 **Toggle on other people's comments** to see what everyone else thinks
+- 📝 **Leave a note** per spot (one per person, editable, 250-char max)
+- 👀 **Toggle on other people's notes** to see what everyone else thinks
+- ➕ **Add your own spots** — place by address, current location, or a map tap;
+  tag swim/play/work; keep them **private** (yours, deletable) or make them
+  **public** (permanent, editable, visible to everyone) with a "Community" badge
 - 🔎 **Filter by category** (All / Swim / Play / Work) and by area
 - 🗺️ **Browse a map** (List/Map toggle) with markers color-coded by swim type;
   a recommendation's **Map** button zooms right in on that spot
@@ -49,12 +52,14 @@ public/               # static front-end (served as Workers assets)
   app.js              #   browser wiring (rendering + cloud/local store)
   logic.js            #   pure, testable logic (shared with tests)
   data/spots.js       #   the curated list of spots
+  data/street-ends.js #   generated SDOT shoreline street ends (do not hand-edit)
   icon.svg            #   app icon (browser tab + manifest)
   icon-192/512.png    #   maskable PNG icons (home-screen shortcut)
   apple-touch-icon.png
   manifest.webmanifest#   PWA manifest (name, theme, icons)
-src/index.mjs         # Cloudflare Worker: /api/entries (D1) + /api/geocode + /api/water + static assets
-schema.sql            # D1 table definition
+src/index.mjs         # Cloudflare Worker: /api/entries + /api/spots (D1) + /api/geocode + /api/water + static assets
+schema.sql            # D1 tables (entries + user_spots)
+scripts/              # gen-street-ends.mjs (refresh data/street-ends.js from SDOT)
 wrangler.toml         # Cloudflare config (Worker entry, assets, D1 binding)
 test/                 # node:test unit tests
 ```
@@ -96,9 +101,10 @@ Now the badge shows "Synced" and comments persist in D1.
 npm test     # node --test
 ```
 
-Covers the pure logic (filters, ratings, entry merging, others'-comment
-visibility, progress stats) and validates the `data/spots.js` dataset
-(unique ids, required fields, valid swim types).
+Covers the pure logic (filters, ratings, entry merging, note cap, spot-edit
+permissions), the Worker API (`/api/entries`, `/api/spots` CRUD + permissions,
+`/api/water`), and validates the spot dataset — including the imported SDOT
+street ends (unique ids, required fields, valid swim types).
 
 ---
 
@@ -172,7 +178,12 @@ website** (dashboard); each is labeled.
 
 The Worker (`src/index.mjs`) exposes:
 
-- `GET|PUT|DELETE /api/entries` — visited / rating / comment storage in D1.
+- `GET|PUT|DELETE /api/entries` — visited / rating / note storage in D1 (notes
+  capped at 250 chars).
+- `GET|POST|PATCH|DELETE /api/spots` — user-created spots. `GET?authorId=` returns
+  all public spots plus the caller's own private ones; `POST` creates one; `PATCH`
+  edits your own (publishing is one-way — public is permanent); `DELETE` removes
+  your own **private** spot only.
 - `GET /api/geocode?q=<place>` — geocodes a place/address to `{ lat, lng, label }`
   for the "nearest swim" finder. It proxies **OpenStreetMap Nominatim** (biased to
   the Seattle area), caches each lookup for a day, and sends a descriptive
@@ -214,6 +225,9 @@ The Worker (`src/index.mjs`) exposes:
     the EPA/USGS Water Quality Portal (`waterqualitydata.us`).
   - [ ] **User-logged observations.** Let users record their own clarity / algae /
     temperature notes per visit over time.
+- [x] **User-created community spots.** Add your own swim/play/work spots (place by
+  address, geolocation, or map tap). Private spots are yours (deletable); public
+  spots are permanent, editable, and shown to everyone with a "Community" badge.
 - [ ] Per-spot photos.
 - [ ] "Hide visited" filter + sort options.
 - [ ] Export/import a profile's notes as JSON.
