@@ -37,6 +37,7 @@
   let markersLayer = null;
   let markersById = {}; // spotId -> Leaflet marker (rebuilt each map render)
   let pendingFocusId = null; // spot to zoom to on the next map render
+  let preserveMapView = false; // when true, the next map render keeps the current center/zoom
 
   // ---------------------------------------------------------------------------
   // Tiny DOM helpers (textContent-first to avoid XSS from user comments).
@@ -485,9 +486,12 @@
     }
   }
 
-  function setOrigin(origin) {
+  function setOrigin(origin, { preserveView = false } = {}) {
     state.prefs.origin = origin;
     savePrefs();
+    // A map click is already framed by the user, so keep their view; an address
+    // search / geolocation fits the origin + recommendations into view instead.
+    preserveMapView = preserveView;
     render();
   }
 
@@ -495,6 +499,8 @@
     state.prefs.origin = null;
     savePrefs();
     $('#finder-status').textContent = '';
+    // Just drop the pin + recommendations; leave the map where the user has it.
+    preserveMapView = true;
     render();
   }
 
@@ -577,8 +583,11 @@
       attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map);
     markersLayer = L.layerGroup().addTo(map);
-    // Click anywhere on the map to drop a start point for the finder.
-    map.on('click', (e) => setOrigin({ lat: e.latlng.lat, lng: e.latlng.lng, label: 'Picked point' }));
+    // Click anywhere on the map to drop a start point for the finder; keep the
+    // user's current zoom/center since they just pointed at where they want it.
+    map.on('click', (e) =>
+      setOrigin({ lat: e.latlng.lat, lng: e.latlng.lng, label: 'Picked point' }, { preserveView: true })
+    );
     return map;
   }
 
@@ -681,10 +690,13 @@
     }
 
     // Focusing a single spot (from a recommendation's "Map" button) zooms in
-    // instead of fitting all markers; otherwise fit everything in view.
+    // instead of fitting all markers; otherwise fit everything in view — unless
+    // we're asked to preserve the current view (e.g. clearing the pin).
     const focusSpot = pendingFocusId ? SPOTS.find((s) => s.id === pendingFocusId) : null;
     const focusMarker = pendingFocusId ? markersById[pendingFocusId] : null;
     pendingFocusId = null;
+    const preserveView = preserveMapView;
+    preserveMapView = false;
 
     // The container may have just been un-hidden, so its size needs recomputing
     // before any setView/fitBounds so the math uses the real dimensions.
@@ -693,7 +705,7 @@
       if (focusSpot && Logic.hasCoords(focusSpot)) {
         map.flyTo([focusSpot.lat, focusSpot.lng], 15, { duration: 0.6 });
         if (focusMarker) focusMarker.openPopup();
-      } else if (points.length) {
+      } else if (!preserveView && points.length) {
         map.fitBounds(points, { padding: [34, 34], maxZoom: 14 });
       }
     }, 0);
