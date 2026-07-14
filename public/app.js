@@ -538,7 +538,7 @@
       // aren't interrupted while you're still thinking.
       commentTimer = setTimeout(
         () => saveField(spot, { comment: comment.value }, saveState, { rerender: false }),
-        1500
+        3000
       );
     });
     comment.addEventListener('blur', () => {
