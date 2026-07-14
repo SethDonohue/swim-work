@@ -1,5 +1,7 @@
 # Swim, Play + Work Seattle
 
+**Live site:** <https://swim-work.donohue-seth.workers.dev>
+
 A tiny static site that maps **swim beaches, waterfront parks, and remote-work
 spots** across the greater Puget Sound area — paired so you can find a good place
 to work (cafe wifi or a mobile hotspot + shade) next to somewhere to swim or
