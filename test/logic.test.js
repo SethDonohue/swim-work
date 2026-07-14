@@ -198,6 +198,73 @@ test('spotMatchesFilters supports the category filter (all/swim/play/work)', () 
   assert.equal(Logic.spotMatchesFilters(workPark, { swimmableOnly: true }), false);
 });
 
+test('swamHereEligible only applies to "No swimming" spots', () => {
+  assert.equal(Logic.swamHereEligible({ swimType: 'No swimming' }), true);
+  assert.equal(Logic.swamHereEligible({ swimType: 'Shoreline access' }), false);
+  assert.equal(Logic.swamHereEligible({ swimType: 'Lifeguarded beach' }), false);
+  assert.equal(Logic.swamHereEligible(null), false);
+});
+
+test('swamHereCount counts distinct swim reports per spot', () => {
+  const entries = [
+    { spotId: 's1', authorId: 'a', swamHere: true },
+    { spotId: 's1', authorId: 'b', swamHere: true },
+    { spotId: 's1', authorId: 'c', swamHere: false }, // opted back out
+    { spotId: 's2', authorId: 'a', swamHere: true },
+  ];
+  assert.equal(Logic.swamHereCount(entries, 's1'), 2);
+  assert.equal(Logic.swamHereCount(entries, 's2'), 1);
+  assert.equal(Logic.swamHereCount(entries, 'nope'), 0);
+});
+
+test('displaySwimType flips a reported "No swimming" spot to Swim-possible', () => {
+  const spot = { id: 's1', swimType: 'No swimming' };
+  const none = Logic.displaySwimType(spot, []);
+  assert.deepEqual(none, { type: 'No swimming', reported: false, count: 0 });
+
+  const reported = Logic.displaySwimType(spot, [{ spotId: 's1', authorId: 'a', swamHere: true }]);
+  assert.deepEqual(reported, { type: Logic.SWIM_POSSIBLE, reported: true, count: 1 });
+
+  // A real swim type is never overridden, even with (spurious) reports.
+  const beach = { id: 's2', swimType: 'Lifeguarded beach' };
+  assert.equal(
+    Logic.displaySwimType(beach, [{ spotId: 's2', authorId: 'a', swamHere: true }]).type,
+    'Lifeguarded beach'
+  );
+});
+
+test('reportedSwimIds widens the Swim filter but not the recommender', () => {
+  const spots = [
+    { id: 'end1', swimType: 'No swimming', goodFor: ['play'], lat: 47.6, lng: -122.3 },
+    { id: 'beach', swimType: 'Lifeguarded beach', lat: 47.61, lng: -122.31 },
+  ];
+  const entries = [{ spotId: 'end1', authorId: 'a', swamHere: true }];
+  const reportedSwimIds = Logic.reportedSwimIds(spots, entries);
+  assert.equal(reportedSwimIds.has('end1'), true);
+
+  // Swim filter now includes the reported street end...
+  assert.equal(
+    Logic.spotMatchesFilters(spots[0], { category: 'swim', reportedSwimIds }),
+    true
+  );
+  // ...but without the set (or for other categories) it's still not swimmable.
+  assert.equal(Logic.spotMatchesFilters(spots[0], { category: 'swim' }), false);
+  assert.equal(Logic.isSwimmable(spots[0]), false);
+
+  // The recommender uses curated swim data only — the reported end stays out.
+  const recs = Logic.recommendSwimSpots(spots, { lat: 47.6, lng: -122.3 }, entries, { limit: 5 });
+  assert.deepEqual(recs.map((r) => r.spot.id), ['beach']);
+});
+
+test('normalizeEntry keeps a swamHere-only entry and round-trips the flag', () => {
+  const swamOnly = Logic.normalizeEntry({ spotId: 's1', authorId: 'me', swamHere: true });
+  assert.equal(swamOnly.swamHere, true);
+  assert.ok(!swamOnly._empty, 'a lone "I swam here" report is worth storing');
+
+  const none = Logic.normalizeEntry({ spotId: 's1', authorId: 'me', swamHere: false });
+  assert.equal(none._empty, true);
+});
+
 test('myEntry / upsertEntry round-trip by (spotId, authorId)', () => {
   let entries = [];
   const a = { spotId: 's1', authorId: 'me', visited: true, rating: 4, comment: 'hi' };

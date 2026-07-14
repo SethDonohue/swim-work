@@ -70,19 +70,71 @@ const Logic = {
     return Logic.spotGoodFor(spot).indexOf('swim') !== -1;
   },
 
+  /**
+   * Derived display label for a "No swimming" spot that swimmers have reported
+   * swimming at. It's not a real dataset swimType — it never appears in the
+   * curated data or validation — only in the UI once there's a community report.
+   */
+  SWIM_POSSIBLE: 'Swim-possible',
+
   /** Marker / swatch color per swim type (kept here so the map + tests agree). */
   SWIM_TYPE_COLORS: {
     'Lifeguarded beach': '#1f9d55',
     'Heated pool': '#0d7fb8',
-    'Saltwater beach': '#b8860d',
+    'Saltwater beach': '#cf5a2e',
     'Beach (no lifeguard)': '#b8860d',
     'Shoreline access': '#0e9aa7',
     'Tide pools': '#7a5cc0',
     'No swimming': '#8aa0b3',
+    'Swim-possible': '#7cb342',
   },
 
   swimTypeColor(swimType) {
     return Logic.SWIM_TYPE_COLORS[swimType] || '#8aa0b3';
+  },
+
+  /**
+   * A "No swimming" spot is the only kind eligible for a user "I swam here"
+   * report — it's the auto-classified label (usually from SDOT text lacking a
+   * swim keyword), not an official prohibition, so swimmers can correct it.
+   */
+  swamHereEligible(spot) {
+    return !!spot && spot.swimType === 'No swimming';
+  },
+
+  /** How many distinct people have reported swimming at a spot. */
+  swamHereCount(entries, spotId) {
+    return (entries || []).filter((e) => e.spotId === spotId && e.swamHere).length;
+  },
+
+  /**
+   * The swim label to *show* for a spot. An eligible "No swimming" spot with at
+   * least one community swim report displays as "Swim-possible" (with the count);
+   * everything else shows its real swimType.
+   */
+  displaySwimType(spot, entries) {
+    if (Logic.swamHereEligible(spot)) {
+      const count = Logic.swamHereCount(entries, spot.id);
+      if (count > 0) return { type: Logic.SWIM_POSSIBLE, reported: true, count };
+    }
+    return { type: (spot && spot.swimType) || '', reported: false, count: 0 };
+  },
+
+  /**
+   * Ids of spots that are community-reported swimmable (a "No swimming" spot
+   * with >=1 report). Used to widen the Swim *filter* only — the safety-sensitive
+   * "best swim near you" recommender still uses the curated swim data.
+   */
+  reportedSwimIds(spots, entries) {
+    const counts = {};
+    for (const e of entries || []) {
+      if (e.swamHere) counts[e.spotId] = (counts[e.spotId] || 0) + 1;
+    }
+    const set = new Set();
+    for (const s of spots || []) {
+      if (Logic.swamHereEligible(s) && (counts[s.id] || 0) > 0) set.add(s.id);
+    }
+    return set;
   },
 
   /** True when a spot has finite numeric coordinates we can map. */
@@ -222,8 +274,13 @@ const Logic = {
     if (f.area && f.area !== 'All' && spot.area !== f.area) return false;
     // `category` supersedes the legacy `swimmableOnly` flag ('swim' == old behavior).
     const category = f.category || (f.swimmableOnly ? 'swim' : 'all');
-    if (category && category !== 'all' && Logic.spotGoodFor(spot).indexOf(category) === -1) {
-      return false;
+    if (category && category !== 'all') {
+      const matchesCat = Logic.spotGoodFor(spot).indexOf(category) !== -1;
+      // Community-reported "Swim-possible" spots count for the Swim filter even
+      // though their curated goodFor doesn't include 'swim'.
+      const reportedSwim =
+        category === 'swim' && f.reportedSwimIds && f.reportedSwimIds.has(spot.id);
+      if (!matchesCat && !reportedSwim) return false;
     }
     const q = (f.query || '').trim().toLowerCase();
     if (q) {
@@ -294,9 +351,11 @@ const Logic = {
       visited: !!raw.visited,
       rating: Logic.coerceRating(raw.rating),
       comment: String(raw.comment || '').slice(0, Logic.NOTE_MAX),
+      swamHere: !!raw.swamHere,
       updatedAt: raw.updatedAt || new Date().toISOString(),
     };
-    const isEmpty = !entry.visited && entry.rating === 0 && !entry.comment.trim();
+    const isEmpty =
+      !entry.visited && entry.rating === 0 && !entry.comment.trim() && !entry.swamHere;
     return isEmpty ? { ...entry, _empty: true } : entry;
   },
 

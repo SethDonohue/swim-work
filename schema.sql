@@ -8,9 +8,16 @@ CREATE TABLE IF NOT EXISTS entries (
   visited     INTEGER NOT NULL DEFAULT 0,   -- 0/1
   rating      INTEGER,                       -- 0–5 (0 / NULL == unrated)
   comment     TEXT,                          -- note; capped at 250 chars in code
+  swam_here   INTEGER NOT NULL DEFAULT 0,    -- 0/1: user reports swimming here; flips a "No swimming" spot to "Swim-possible"
   updated_at  TEXT    NOT NULL,              -- ISO-8601 timestamp
   PRIMARY KEY (spot_id, author_id)
 );
+
+-- Migration for databases created before `swam_here` existed. SQLite has no
+-- "ADD COLUMN IF NOT EXISTS"; run this once against an existing DB (it errors
+-- harmlessly with "duplicate column name" on a DB already built from the
+-- CREATE TABLE above):
+--   ALTER TABLE entries ADD COLUMN swam_here INTEGER NOT NULL DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS idx_entries_spot ON entries (spot_id);
 CREATE INDEX IF NOT EXISTS idx_entries_author ON entries (author_id);

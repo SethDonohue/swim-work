@@ -58,6 +58,7 @@ export function rowToEntry(row) {
     visited: !!row.visited,
     rating: row.rating == null ? 0 : Number(row.rating),
     comment: row.comment || '',
+    swamHere: !!row.swam_here,
     updatedAt: row.updated_at,
   };
 }
@@ -194,17 +195,19 @@ async function putEntry(request, env) {
     visited: body.visited ? 1 : 0,
     rating: clampRating(body.rating),
     comment: String(body.comment || '').slice(0, NOTE_MAX),
+    swam_here: body.swamHere ? 1 : 0,
     updated_at: new Date().toISOString(),
   };
 
   await env.DB.prepare(
-    `INSERT INTO entries (spot_id, author_id, author_name, visited, rating, comment, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO entries (spot_id, author_id, author_name, visited, rating, comment, swam_here, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(spot_id, author_id) DO UPDATE SET
        author_name = excluded.author_name,
        visited     = excluded.visited,
        rating      = excluded.rating,
        comment     = excluded.comment,
+       swam_here   = excluded.swam_here,
        updated_at  = excluded.updated_at`
   )
     .bind(
@@ -214,6 +217,7 @@ async function putEntry(request, env) {
       entry.visited,
       entry.rating,
       entry.comment,
+      entry.swam_here,
       entry.updated_at
     )
     .run();
