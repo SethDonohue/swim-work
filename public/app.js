@@ -44,12 +44,21 @@
     return allSpots().find((s) => s.id === id) || null;
   }
 
+  // Current prefs plus the set of community-reported swimmable spot ids, so the
+  // Swim filter includes "Swim-possible" spots. Recomputed per call (cheap).
+  function activeFilters() {
+    return Object.assign({}, state.prefs, {
+      reportedSwimIds: Logic.reportedSwimIds(allSpots(), state.entries),
+    });
+  }
+
   // Leaflet map handles (created lazily the first time the map view is shown).
   let map = null;
   let markersLayer = null;
   let markersById = {}; // spotId -> Leaflet marker (rebuilt each map render)
   let pendingFocusId = null; // spot to zoom to on the next map render
   let preserveMapView = false; // when true, the next map render keeps the current center/zoom
+  let selectedDetailId = null; // spot whose full card is shown in the panel under the map
 
   // Add/edit-spot modal state.
   let editingSpotId = null; // null = creating a new spot
@@ -263,6 +272,7 @@
     'Shoreline access': 'badge--swim-shoreline',
     'Tide pools': 'badge--swim-tide',
     'No swimming': 'badge--swim-none',
+    'Swim-possible': 'badge--swim-possible',
   };
 
   function updateSyncPill() {
@@ -284,24 +294,23 @@
       `Visited ${stats.visited}/${stats.total} · ${stats.rated} rated · ${stats.commented} noted`;
   }
 
-  function renderAreaTabs() {
-    const tabs = $('#area-tabs');
-    tabs.textContent = '';
+  // Refresh just the progress line without rebuilding cards — used after a note
+  // auto-save so the focused textarea (and the mobile keyboard) survive.
+  function updateProgress() {
+    renderProgress(allSpots().filter((s) => Logic.spotMatchesFilters(s, activeFilters())));
+  }
+
+  function renderAreaSelect() {
+    const sel = $('#area-select');
     const areas = ['All'].concat(Logic.areaList(allSpots()));
+    // Drop a persisted area that no longer exists (e.g. an area that only came
+    // from a since-deleted community spot) so the filter can't get stuck empty.
+    if (areas.indexOf(state.prefs.area) === -1) state.prefs.area = 'All';
+    sel.textContent = '';
     for (const area of areas) {
-      const btn = el('button', {
-        class: 'area-tab' + (state.prefs.area === area ? ' is-active' : ''),
-        type: 'button',
-        role: 'tab',
-        text: area,
-        onclick: () => {
-          state.prefs.area = area;
-          savePrefs();
-          render();
-        },
-      });
-      tabs.appendChild(btn);
+      sel.appendChild(el('option', { value: area, text: area === 'All' ? 'All areas' : area }));
     }
+    sel.value = state.prefs.area || 'All';
   }
 
   function renderStars(spot, mine) {
@@ -431,8 +440,15 @@
       ])
     );
 
+    const disp = Logic.displaySwimType(spot, state.entries);
+    const swimBadge = el('span', { class: badgeClassForSwim(disp.type), text: disp.type });
+    if (disp.reported) {
+      swimBadge.title = `Reported swimmable by ${disp.count} ${
+        disp.count === 1 ? 'person' : 'people'
+      } — user-reported, unofficial. Waters here are unmonitored and unguarded.`;
+    }
     const badges = [
-      el('span', { class: badgeClassForSwim(spot.swimType), text: spot.swimType }),
+      swimBadge,
       el('span', { class: 'badge badge--water', text: spot.water + 'water' }),
     ];
     const wq = waterChip(spot);
@@ -518,18 +534,46 @@
       saveState.textContent = 'Editing…';
       updateCount();
       clearTimeout(commentTimer);
-      commentTimer = setTimeout(() => saveField(spot, { comment: comment.value }, saveState), 700);
+      // Auto-save after a longer pause, and without a re-render so typing/keyboard
+      // aren't interrupted while you're still thinking.
+      commentTimer = setTimeout(
+        () => saveField(spot, { comment: comment.value }, saveState, { rerender: false }),
+        1500
+      );
     });
     comment.addEventListener('blur', () => {
       clearTimeout(commentTimer);
-      saveField(spot, { comment: comment.value }, saveState);
+      saveField(spot, { comment: comment.value }, saveState, { rerender: false });
     });
+
+    // "I swam here" — only on "No swimming" spots (mislabeled shoreline access).
+    // A report flips the badge to "Swim-possible" and lists it under the Swim filter.
+    let swamRow = null;
+    if (Logic.swamHereEligible(spot)) {
+      const swamCheckbox = el('input', { type: 'checkbox' });
+      swamCheckbox.checked = !!(mine && mine.swamHere);
+      swamCheckbox.addEventListener('change', () =>
+        saveField(spot, { swamHere: swamCheckbox.checked })
+      );
+      const count = Logic.swamHereCount(state.entries, spot.id);
+      const note = count
+        ? `Reported swimmable by ${count} ${count === 1 ? 'person' : 'people'}`
+        : 'Not a designated swim spot — mark if you’ve swum here';
+      swamRow = el('div', { class: 'swamhere' }, [
+        el('label', { class: 'swamhere__label' }, [
+          swamCheckbox,
+          document.createTextNode(' 🏊 I’ve swum here'),
+        ]),
+        el('span', { class: 'swamhere__count', text: note }),
+      ]);
+    }
 
     const controls = el('div', { class: 'controls' }, [
       el('div', { class: 'controls__row' }, [
         el('label', { class: 'visited' }, [visitedCheckbox, document.createTextNode('Visited')]),
         renderStars(spot, mine),
       ]),
+      swamRow,
       comment,
       el('div', { class: 'controls__foot' }, [saveState, counter]),
     ]);
@@ -550,8 +594,8 @@
   }
 
   function render() {
-    renderAreaTabs();
-    const filtered = allSpots().filter((s) => Logic.spotMatchesFilters(s, state.prefs));
+    renderAreaSelect();
+    const filtered = allSpots().filter((s) => Logic.spotMatchesFilters(s, activeFilters()));
     renderProgress(filtered);
 
     renderFinderResults();
@@ -562,13 +606,60 @@
     $('#empty').hidden = filtered.length !== 0;
 
     if (mapView) {
+      // Clear stale list cards so their ids can't collide with the detail panel.
+      $('#spots').textContent = '';
       renderMap(filtered);
+      renderMapDetail(filtered);
+      updateScrollTopBtn();
       return;
     }
 
     const container = $('#spots');
     container.textContent = '';
     for (const spot of filtered) container.appendChild(renderCard(spot));
+    updateScrollTopBtn();
+  }
+
+  // Show a spot's full, editable card in a panel just below the map (from a
+  // marker popup's "View details"), keeping the user in Map view.
+  function showMapDetail(spotId) {
+    selectedDetailId = spotId;
+    preserveMapView = true; // don't refit/jump the map when the panel opens
+    if (map) map.closePopup(); // the panel replaces the popup's info
+    renderMapDetail(allSpots().filter((s) => Logic.spotMatchesFilters(s, activeFilters())));
+    const panel = $('#map-detail');
+    if (!panel.hidden) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function closeMapDetail() {
+    selectedDetailId = null;
+    const panel = $('#map-detail');
+    panel.hidden = true;
+    panel.textContent = '';
+  }
+
+  function renderMapDetail(filtered) {
+    const panel = $('#map-detail');
+    panel.textContent = '';
+    const spot = selectedDetailId ? findSpot(selectedDetailId) : null;
+    // Drop the panel if the spot is gone or filtered out of the current view.
+    if (!spot || !filtered.some((s) => s.id === spot.id)) {
+      selectedDetailId = null;
+      panel.hidden = true;
+      return;
+    }
+    const head = el('div', { class: 'map-detail__head' }, [
+      el('span', { class: 'map-detail__label', text: 'Selected spot' }),
+      el('button', {
+        class: 'btn btn--ghost map-detail__close',
+        type: 'button',
+        text: '✕ Close',
+        onclick: closeMapDetail,
+      }),
+    ]);
+    panel.appendChild(head);
+    panel.appendChild(renderCard(spot));
+    panel.hidden = false;
   }
 
   // ---------------------------------------------------------------------------
@@ -744,10 +835,11 @@
   }
 
   function buildPopup(spot) {
+    const disp = Logic.displaySwimType(spot, state.entries);
     return el('div', { class: 'mappop' }, [
       el('span', { class: 'mappop__area', text: spot.area }),
       el('h3', { class: 'mappop__title', text: spot.name }),
-      el('span', { class: badgeClassForSwim(spot.swimType), text: spot.swimType }),
+      el('span', { class: badgeClassForSwim(disp.type), text: disp.type }),
       el('p', { class: 'mappop__swim', text: spot.swim }),
       waterChip(spot),
       el('div', { class: 'mappop__actions' }, [
@@ -755,7 +847,7 @@
           class: 'btn btn--primary mappop__btn',
           type: 'button',
           text: 'View details',
-          onclick: () => jumpToCard(spot.id),
+          onclick: () => showMapDetail(spot.id),
         }),
         el('a', {
           class: 'card__map',
@@ -791,7 +883,7 @@
         radius: isRec ? 12 : 9,
         weight: visited ? 3 : 2,
         color: visited ? '#f4b740' : '#ffffff',
-        fillColor: Logic.swimTypeColor(spot.swimType),
+        fillColor: Logic.swimTypeColor(Logic.displaySwimType(spot, state.entries).type),
         fillOpacity: 0.95,
       });
       marker.bindPopup(buildPopup(spot));
@@ -831,7 +923,9 @@
     const focusSpot = pendingFocusId ? findSpot(pendingFocusId) : null;
     const focusMarker = pendingFocusId ? markersById[pendingFocusId] : null;
     pendingFocusId = null;
-    const preserveView = preserveMapView;
+    // Keep the current view when explicitly asked, or whenever the detail panel
+    // is open (so editing a note/rating doesn't refit and jump the map).
+    const preserveView = preserveMapView || (!!selectedDetailId && !focusSpot);
     preserveMapView = false;
 
     // The container may have just been un-hidden, so its size needs recomputing
@@ -858,6 +952,7 @@
       'Saltwater beach',
       'Beach (no lifeguard)',
       'Shoreline access',
+      'Swim-possible',
       'Tide pools',
       'No swimming',
     ];
@@ -910,6 +1005,18 @@
     savePrefs();
     syncViewToggle();
     render();
+  }
+
+  // Show the back-to-top button once the list is scrolled past its first item.
+  function updateScrollTopBtn() {
+    const btn = $('#scroll-top');
+    if (!btn) return;
+    let show = false;
+    if (state.prefs.view === 'list') {
+      const first = document.querySelector('#spots .card');
+      if (first) show = first.getBoundingClientRect().bottom < 0;
+    }
+    btn.classList.toggle('is-visible', show);
   }
 
   // ---------------------------------------------------------------------------
@@ -1032,7 +1139,10 @@
   // ---------------------------------------------------------------------------
   // Saving a single field on the user's entry
   // ---------------------------------------------------------------------------
-  async function saveField(spot, patch, saveStateEl) {
+  async function saveField(spot, patch, saveStateEl, opts) {
+    // `rerender: false` skips the full card rebuild — used for note auto-saves so
+    // the focused textarea (and the mobile keyboard) aren't torn down mid-edit.
+    const rerender = !(opts && opts.rerender === false);
     const existing = Logic.myEntry(state.entries, spot.id, state.profile.id) || {};
     const merged = Logic.normalizeEntry({
       spotId: spot.id,
@@ -1041,6 +1151,7 @@
       visited: 'visited' in patch ? patch.visited : existing.visited,
       rating: 'rating' in patch ? patch.rating : existing.rating,
       comment: 'comment' in patch ? patch.comment : existing.comment,
+      swamHere: 'swamHere' in patch ? patch.swamHere : existing.swamHere,
       updatedAt: new Date().toISOString(),
     });
 
@@ -1056,8 +1167,13 @@
       }
     }
 
-    // Re-render so visited styling / stars / progress stay in sync.
-    render();
+    if (rerender) {
+      // Rebuild so visited styling / stars / progress stay in sync.
+      render();
+    } else {
+      // Note-only save: keep the card (and focus) intact, just refresh the count.
+      updateProgress();
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1112,6 +1228,12 @@
         syncCategoryButtons();
         render();
       });
+    });
+
+    $('#area-select').addEventListener('change', (e) => {
+      state.prefs.area = e.target.value;
+      savePrefs();
+      render();
     });
 
     $('#toggle-others').addEventListener('change', (e) => {
@@ -1213,6 +1335,24 @@
       localStorage.setItem(THEME_KEY, next);
       applyTheme(next);
     });
+
+    // Back-to-top: fade in past the first list item; click smooth-scrolls up.
+    $('#scroll-top').addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    let scrollRaf = null;
+    window.addEventListener(
+      'scroll',
+      () => {
+        if (scrollRaf) return;
+        scrollRaf = requestAnimationFrame(() => {
+          scrollRaf = null;
+          updateScrollTopBtn();
+        });
+      },
+      { passive: true }
+    );
+    window.addEventListener('resize', updateScrollTopBtn, { passive: true });
   }
 
   // ---------------------------------------------------------------------------

@@ -281,28 +281,32 @@ input {
   color: var(--primary-ink);
   border-color: var(--primary);
 }
-.area-tabs {
+.area-filter {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
-  flex-wrap: wrap;
 }
-.area-tab {
+.area-filter__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+.area-select {
+  flex: 1;
+  min-width: 0;
+  max-width: 320px;
   border: 1px solid var(--border);
   background: var(--surface);
-  color: var(--text-soft);
-  border-radius: 999px;
-  padding: 0.4rem 0.9rem;
-  font-size: 0.85rem;
+  color: var(--text);
+  border-radius: 10px;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
 }
-.area-tab:hover {
+.area-select:focus {
+  outline: 2px solid color-mix(in srgb, var(--primary) 55%, transparent);
   border-color: var(--primary);
-}
-.area-tab.is-active {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: var(--primary-ink);
 }
 
 /* ---------- Nearest-swim finder ---------- */
@@ -447,6 +451,39 @@ input {
   color: var(--text-soft);
   padding: 2rem;
 }
+/* Selected-spot detail panel shown just below the map. */
+.map-detail {
+  margin-top: 0.85rem;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 0.5rem 0.75rem 0.85rem;
+}
+.map-detail__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+.map-detail__label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+}
+.map-detail__close {
+  font-size: 0.8rem;
+}
+/* The detail panel reuses a full card; drop its outer chrome to avoid a box-in-a-box. */
+.map-detail .card {
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  background: transparent;
+}
+
 .map-legend {
   display: flex;
   flex-wrap: wrap;
@@ -581,7 +618,11 @@ input {
   border-color: #0d7fb8;
   color: #0d7fb8;
 }
-.badge--swim-salt,
+.badge--swim-salt {
+  background: color-mix(in srgb, #cf5a2e 18%, transparent);
+  border-color: #cf5a2e;
+  color: #cf5a2e;
+}
 .badge--swim-nolifeguard {
   background: color-mix(in srgb, #b8860d 18%, transparent);
   border-color: #b8860d;
@@ -600,6 +641,12 @@ input {
 .badge--swim-none {
   background: var(--surface-2);
   color: var(--text-soft);
+}
+/* Community-reported "Swim-possible" (a "No swimming" spot swimmers vouch for). */
+.badge--swim-possible {
+  background: color-mix(in srgb, #7cb342 20%, transparent);
+  border-color: #7cb342;
+  color: #5a8a2e;
 }
 .badge--water {
   color: var(--text-soft);
@@ -774,6 +821,36 @@ input {
   white-space: nowrap;
 }
 
+/* "I swam here" report row (only on "No swimming" spots). */
+.swamhere {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.4rem 0.55rem;
+  border: 1px dashed color-mix(in srgb, #7cb342 55%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, #7cb342 8%, transparent);
+}
+.swamhere__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.swamhere__label input {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: #7cb342;
+}
+.swamhere__count {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
 /* ---------- Others' comments ---------- */
 .others {
   border-top: 1px dashed var(--border);
@@ -873,6 +950,34 @@ input {
 }
 .fab:active {
   transform: translateY(1px);
+}
+
+/* ---------- Back-to-top button (list view) ---------- */
+.scroll-top {
+  position: fixed;
+  left: 1.1rem;
+  bottom: 1.1rem;
+  z-index: 900;
+  width: 2.9rem;
+  height: 2.9rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.25rem;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.scroll-top.is-visible {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
 }
 
 /* ---------- Modal (add / edit spot) ---------- */

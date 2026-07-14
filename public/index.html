@@ -117,7 +117,10 @@
             </button>
           </div>
         </div>
-        <div id="area-tabs" class="area-tabs" role="tablist" aria-label="Filter by area"></div>
+        <div class="area-filter">
+          <label for="area-select" class="area-filter__label">Area</label>
+          <select id="area-select" class="area-select" aria-label="Filter by area"></select>
+        </div>
       </section>
 
       <section class="finder" aria-label="Find the nearest swim spot">
@@ -147,10 +150,15 @@
         <p id="map-fallback" class="map-fallback" hidden>
           Map couldn't load — check your connection and try again.
         </p>
+        <div id="map-detail" class="map-detail" hidden aria-live="polite"></div>
         <div id="map-legend" class="map-legend" aria-hidden="true"></div>
       </section>
 
       <p id="empty" class="empty" hidden>No spots match your filters.</p>
+
+      <button id="scroll-top" class="scroll-top" type="button" title="Back to top" aria-label="Scroll back to top of the list">
+        <span aria-hidden="true">↑</span>
+      </button>
 
       <button id="add-spot-fab" class="fab" type="button" title="Add a spot">
         <span aria-hidden="true">＋</span> Add a spot
