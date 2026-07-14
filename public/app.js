@@ -32,6 +32,8 @@
       category: 'all', // 'all' | 'swim' | 'play' | 'work'
       view: 'list',
       origin: null, // { lat, lng, label } for the "nearest swim" finder
+      mapCam: null, // { lat, lng, zoom } — last map center/zoom, restored on reopen
+      detailId: null, // spot id whose detail panel was open in map view
     },
   };
 
@@ -59,6 +61,8 @@
   let pendingFocusId = null; // spot to zoom to on the next map render
   let preserveMapView = false; // when true, the next map render keeps the current center/zoom
   let selectedDetailId = null; // spot whose full card is shown in the panel under the map
+  let restoreMapCam = false; // one-shot: on first map render, restore the saved camera instead of fitting
+  let fitNext = false; // one-shot: reframe (fit all markers) on the next map render (set by filter/finder actions)
 
   // Add/edit-spot modal state.
   let editingSpotId = null; // null = creating a new spot
@@ -624,6 +628,8 @@
   // marker popup's "View details"), keeping the user in Map view.
   function showMapDetail(spotId) {
     selectedDetailId = spotId;
+    state.prefs.detailId = spotId; // persist so a reopened tab restores the panel
+    savePrefs();
     preserveMapView = true; // don't refit/jump the map when the panel opens
     if (map) map.closePopup(); // the panel replaces the popup's info
     renderMapDetail(allSpots().filter((s) => Logic.spotMatchesFilters(s, activeFilters())));
@@ -633,6 +639,8 @@
 
   function closeMapDetail() {
     selectedDetailId = null;
+    state.prefs.detailId = null;
+    savePrefs();
     const panel = $('#map-detail');
     panel.hidden = true;
     panel.textContent = '';
@@ -644,7 +652,11 @@
     const spot = selectedDetailId ? findSpot(selectedDetailId) : null;
     // Drop the panel if the spot is gone or filtered out of the current view.
     if (!spot || !filtered.some((s) => s.id === spot.id)) {
-      selectedDetailId = null;
+      if (selectedDetailId) {
+        selectedDetailId = null;
+        state.prefs.detailId = null;
+        savePrefs();
+      }
       panel.hidden = true;
       return;
     }
@@ -709,8 +721,12 @@
     // A map click is already framed by the user, so keep their view; an address
     // search / geolocation fits the origin + recommendations into view instead.
     preserveMapView = preserveView;
-    if (preserveView) renderKeepingMapStable();
-    else render();
+    if (preserveView) {
+      renderKeepingMapStable();
+    } else {
+      fitNext = true; // frame the origin + recommendations
+      render();
+    }
   }
 
   function clearOrigin() {
@@ -789,18 +805,40 @@
   // ---------------------------------------------------------------------------
   // Map view (Leaflet + OpenStreetMap, no API key)
   // ---------------------------------------------------------------------------
+  // Persist the current map center/zoom so a reopened tab returns to it.
+  function saveMapCam() {
+    if (!map) return;
+    const c = map.getCenter();
+    state.prefs.mapCam = {
+      lat: Number(c.lat.toFixed(5)),
+      lng: Number(c.lng.toFixed(5)),
+      zoom: map.getZoom(),
+    };
+    savePrefs();
+  }
+
   function ensureMap() {
     if (map) return map;
     if (typeof window.L === 'undefined') {
       $('#map-fallback').hidden = false;
       return null;
     }
-    map = L.map('map', { scrollWheelZoom: true }).setView([47.62, -122.33], 11);
+    // Start at the user's last camera (if saved) so a reopened tab lands where
+    // they left off; renderMap keeps this view on the first render (see below).
+    const cam = state.prefs.mapCam;
+    restoreMapCam = !!(cam && Logic.hasCoords(cam));
+    map = L.map('map', { scrollWheelZoom: true }).setView(
+      restoreMapCam ? [cam.lat, cam.lng] : [47.62, -122.33],
+      restoreMapCam ? cam.zoom : 11
+    );
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map);
     markersLayer = L.layerGroup().addTo(map);
+    // Remember where the user pans/zooms to so we can restore it next session.
+    // 'moveend' fires after both panning and zooming, so one listener covers both.
+    map.on('moveend', saveMapCam);
     // Click anywhere on the map to drop a start point for the finder; keep the
     // user's current zoom/center since they just pointed at where they want it.
     // When the add/edit-spot form is picking a location, set that instead.
@@ -928,6 +966,18 @@
     const preserveView = preserveMapView || (!!selectedDetailId && !focusSpot);
     preserveMapView = false;
 
+    // Camera handling. The map preserves the user's current center/zoom by
+    // default so background re-renders (data loads, note saves) don't move it.
+    // It only reframes when: focusing one spot, the user changes a filter/finder
+    // (fitNext), restoring a saved camera on first open, or the very first open
+    // for a brand-new user who has no saved camera yet.
+    const cam = state.prefs.mapCam;
+    const haveCam = !!(cam && Logic.hasCoords(cam));
+    const doFirstRestore = restoreMapCam && haveCam && !focusSpot;
+    restoreMapCam = false;
+    const explicitFit = fitNext && !preserveView;
+    fitNext = false;
+
     // The container may have just been un-hidden, so its size needs recomputing
     // before any setView/fitBounds so the math uses the real dimensions.
     setTimeout(() => {
@@ -935,7 +985,12 @@
       if (focusSpot && Logic.hasCoords(focusSpot)) {
         map.flyTo([focusSpot.lat, focusSpot.lng], 15, { duration: 0.6 });
         if (focusMarker) focusMarker.openPopup();
-      } else if (!preserveView && points.length) {
+      } else if (doFirstRestore) {
+        map.setView([cam.lat, cam.lng], cam.zoom);
+      } else if (explicitFit && points.length) {
+        map.fitBounds(points, { padding: [34, 34], maxZoom: 14 });
+      } else if (!haveCam && !preserveView && points.length) {
+        // Brand-new user with no saved view: frame all spots once.
         map.fitBounds(points, { padding: [34, 34], maxZoom: 14 });
       }
     }, 0);
@@ -1218,6 +1273,7 @@
     $('#search').addEventListener('input', (e) => {
       state.prefs.query = e.target.value;
       savePrefs();
+      fitNext = true; // reframe the map to the new matches
       render();
     });
 
@@ -1226,6 +1282,7 @@
         state.prefs.category = btn.dataset.cat || 'all';
         savePrefs();
         syncCategoryButtons();
+        fitNext = true; // reframe the map to the new category
         render();
       });
     });
@@ -1233,6 +1290,7 @@
     $('#area-select').addEventListener('change', (e) => {
       state.prefs.area = e.target.value;
       savePrefs();
+      fitNext = true; // reframe the map to the selected area
       render();
     });
 
@@ -1368,6 +1426,9 @@
       state.prefs.category = state.prefs.swimmableOnly ? 'swim' : 'all';
     }
     delete state.prefs.swimmableOnly;
+
+    // Restore the map detail panel the user last had open (map view only).
+    selectedDetailId = state.prefs.detailId || null;
 
     bindControls();
 
