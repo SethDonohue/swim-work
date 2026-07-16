@@ -14,10 +14,35 @@
   const PROFILE_KEY = 'swimwork.profile';
   const ENTRIES_CACHE_KEY = 'swimwork.entries';
   const USERSPOTS_CACHE_KEY = 'swimwork.userspots';
+  const WATER_CACHE_KEY = 'swimwork.water';
   const PREFS_KEY = 'swimwork.prefs';
   const THEME_KEY = 'swimwork.theme';
   const API_URL = '/api/entries';
   const SPOTS_URL = '/api/spots';
+
+  const PREFS_VERSION = 1;
+  const RECENT_MAX = 8; // how many "recently viewed" spots to keep
+  // Rough Puget Sound bounding box, used to reject corrupt persisted coordinates.
+  const WA_BOUNDS = { minLat: 45.5, maxLat: 49.5, minLng: -125.5, maxLng: -116.0 };
+
+  // Fresh copy of the default prefs (never share a mutable literal).
+  function defaultPrefs() {
+    return {
+      version: PREFS_VERSION,
+      showOthers: false,
+      area: 'All',
+      query: '',
+      category: 'all', // 'all' | 'swim' | 'play' | 'work'
+      view: 'list',
+      units: 'mi', // 'mi' | 'km' — distance units in the finder
+      origin: null, // { lat, lng, label } for the "nearest swim" finder
+      mapCam: null, // { lat, lng, zoom } — last map center/zoom, restored on reopen
+      detailId: null, // spot id whose detail panel was open in map view
+      listScroll: 0, // last window scroll offset in list view
+      recent: [], // recently viewed spot ids, most-recent-first
+      tipsSeen: false, // dismissed the first-run tip
+    };
+  }
 
   const state = {
     profile: null,
@@ -25,16 +50,7 @@
     userSpots: [], // community + own spots from /api/spots
     water: null, // { source, updated, beaches: { name: {...} } } from /api/water
     mode: 'local', // 'cloud' | 'local'
-    prefs: {
-      showOthers: false,
-      area: 'All',
-      query: '',
-      category: 'all', // 'all' | 'swim' | 'play' | 'work'
-      view: 'list',
-      origin: null, // { lat, lng, label } for the "nearest swim" finder
-      mapCam: null, // { lat, lng, zoom } — last map center/zoom, restored on reopen
-      detailId: null, // spot id whose detail panel was open in map view
-    },
+    prefs: defaultPrefs(),
   };
 
   // Curated spots (global SPOTS) + community spots, merged for every view.
@@ -112,6 +128,59 @@
     }
   }
 
+  // A lat/lng inside the Puget Sound bounding box (guards against corrupt data).
+  function inRegion(pt) {
+    return (
+      pt &&
+      Number.isFinite(pt.lat) &&
+      Number.isFinite(pt.lng) &&
+      pt.lat >= WA_BOUNDS.minLat &&
+      pt.lat <= WA_BOUNDS.maxLat &&
+      pt.lng >= WA_BOUNDS.minLng &&
+      pt.lng <= WA_BOUNDS.maxLng
+    );
+  }
+
+  // Coerce whatever is in localStorage into a valid prefs object. Bad/stale
+  // values fall back to defaults so a corrupt entry can't wedge the UI, and the
+  // legacy `swimmableOnly` flag is migrated to the `category` filter. As the
+  // prefs schema grows, bump PREFS_VERSION and add migrations here.
+  function sanitizePrefs(raw) {
+    const out = defaultPrefs();
+    if (!raw || typeof raw !== 'object') return out;
+
+    const cats = ['all', 'swim', 'play', 'work'];
+    out.category = cats.indexOf(raw.category) !== -1 ? raw.category : raw.swimmableOnly ? 'swim' : 'all';
+    out.view = raw.view === 'map' ? 'map' : 'list';
+    out.area = typeof raw.area === 'string' && raw.area ? raw.area : 'All';
+    out.query = typeof raw.query === 'string' ? raw.query : '';
+    out.showOthers = !!raw.showOthers;
+    out.units = raw.units === 'km' ? 'km' : 'mi';
+    out.tipsSeen = !!raw.tipsSeen;
+    out.detailId = typeof raw.detailId === 'string' ? raw.detailId : null;
+    out.listScroll = Number.isFinite(raw.listScroll) && raw.listScroll >= 0 ? raw.listScroll : 0;
+
+    out.origin =
+      raw.origin && inRegion(raw.origin)
+        ? {
+            lat: raw.origin.lat,
+            lng: raw.origin.lng,
+            label: typeof raw.origin.label === 'string' ? raw.origin.label : '',
+          }
+        : null;
+
+    out.mapCam =
+      raw.mapCam && inRegion(raw.mapCam) && Number.isFinite(raw.mapCam.zoom) && raw.mapCam.zoom >= 3 && raw.mapCam.zoom <= 19
+        ? { lat: raw.mapCam.lat, lng: raw.mapCam.lng, zoom: raw.mapCam.zoom }
+        : null;
+
+    out.recent = Array.isArray(raw.recent)
+      ? raw.recent.filter((x) => typeof x === 'string').slice(0, RECENT_MAX)
+      : [];
+
+    return out;
+  }
+
   // ---------------------------------------------------------------------------
   // Entries store: cloud first, local cache fallback.
   // ---------------------------------------------------------------------------
@@ -156,8 +225,12 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       state.water = data && data.beaches ? data : null;
+      if (state.water) writeJSON(WATER_CACHE_KEY, { ts: Date.now(), data: state.water });
     } catch (_) {
-      state.water = null;
+      // Offline / upstream down: fall back to the last good reading so chips
+      // still render (the card shows the reading's own "updated" date).
+      const cached = readJSON(WATER_CACHE_KEY, null);
+      state.water = cached && cached.data ? cached.data : null;
     }
   }
 
@@ -259,8 +332,14 @@
     $('#login').hidden = true;
     $('#app').hidden = false;
     $('#profile-name').textContent = profile.name;
+    updateIntroTip();
+    // Seed water chips from the last cached reading so they show instantly on
+    // reopen; loadWater() refreshes them below.
+    const cachedWater = readJSON(WATER_CACHE_KEY, null);
+    if (cachedWater && cachedWater.data) state.water = cachedWater.data;
     await Promise.all([loadEntries(), loadUserSpots()]);
     render();
+    restoreListScroll();
     // Fetch water quality in the background; re-render to show chips when ready.
     loadWater().then(() => render());
   }
@@ -620,6 +699,8 @@
 
     const container = $('#spots');
     container.textContent = '';
+    const recentRow = buildRecentRow();
+    if (recentRow) container.appendChild(recentRow);
     for (const spot of filtered) container.appendChild(renderCard(spot));
     updateScrollTopBtn();
   }
@@ -629,6 +710,7 @@
   function showMapDetail(spotId) {
     selectedDetailId = spotId;
     state.prefs.detailId = spotId; // persist so a reopened tab restores the panel
+    recordRecent(spotId);
     savePrefs();
     preserveMapView = true; // don't refit/jump the map when the panel opens
     if (map) map.closePopup(); // the panel replaces the popup's info
@@ -678,6 +760,10 @@
   // Nearest-swim finder (geocode / geolocation / map-click -> recommendations)
   // ---------------------------------------------------------------------------
   function formatDistance(km) {
+    if (state.prefs.units === 'km') {
+      if (km < 0.1) return '< 0.1 km';
+      return `${km.toFixed(1)} km`;
+    }
     const mi = km * 0.621371;
     if (mi < 0.1) return '< 0.1 mi';
     return `${mi.toFixed(1)} mi`;
@@ -752,9 +838,23 @@
     const recs = Logic.recommendSwimSpots(allSpots(), origin, state.entries, { limit: 3 });
     box.textContent = '';
     box.appendChild(
-      el('p', { class: 'finder__label' }, [
-        document.createTextNode('Best swims near '),
-        el('b', { text: origin.label || 'your location' }),
+      el('div', { class: 'finder__reshead' }, [
+        el('p', { class: 'finder__label' }, [
+          document.createTextNode('Best swims near '),
+          el('b', { text: origin.label || 'your location' }),
+        ]),
+        el('button', {
+          class: 'units-toggle',
+          type: 'button',
+          text: state.prefs.units === 'km' ? 'km' : 'mi',
+          title: 'Toggle distance units (mi/km)',
+          'aria-label': 'Toggle distance units',
+          onclick: () => {
+            state.prefs.units = state.prefs.units === 'km' ? 'mi' : 'km';
+            savePrefs();
+            renderFinderResults();
+          },
+        }),
       ])
     );
 
@@ -1022,6 +1122,7 @@
   }
 
   function jumpToCard(spotId) {
+    recordRecent(spotId);
     setView('list');
     const card = document.getElementById('card-' + spotId);
     if (!card) return;
@@ -1032,6 +1133,7 @@
 
   // Switch to the map and zoom in on a single spot (from a recommendation).
   function jumpToMap(spotId) {
+    recordRecent(spotId);
     pendingFocusId = spotId;
     setView('map');
   }
@@ -1072,6 +1174,67 @@
       if (first) show = first.getBoundingClientRect().bottom < 0;
     }
     btn.classList.toggle('is-visible', show);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Session state: list scroll, recently viewed, first-run tip
+  // ---------------------------------------------------------------------------
+  // Persist the list-view scroll offset (throttled) so reopening returns to it.
+  let scrollSaveTs = 0;
+  function saveListScroll() {
+    if (state.prefs.view !== 'list') return;
+    const now = Date.now();
+    if (now - scrollSaveTs < 400) return;
+    scrollSaveTs = now;
+    state.prefs.listScroll = Math.round(window.scrollY);
+    savePrefs();
+  }
+
+  let listScrollRestored = false;
+  function restoreListScroll() {
+    if (listScrollRestored) return;
+    listScrollRestored = true;
+    if (state.prefs.view !== 'list') return;
+    const y = state.prefs.listScroll || 0;
+    // Wait a frame so the list has laid out before we jump to the saved offset.
+    if (y > 0) requestAnimationFrame(() => window.scrollTo(0, y));
+  }
+
+  // Track spots the user engages with, for the "Recently viewed" shortcuts.
+  function recordRecent(id) {
+    if (!id) return;
+    const list = (state.prefs.recent || []).filter((x) => x !== id);
+    list.unshift(id);
+    state.prefs.recent = list.slice(0, RECENT_MAX);
+    savePrefs();
+  }
+
+  // A chips row of recently viewed spots, shown atop the list (skips any ids
+  // whose spot no longer exists, e.g. a deleted community spot).
+  function buildRecentRow() {
+    const spots = (state.prefs.recent || []).map(findSpot).filter(Boolean);
+    if (!spots.length) return null;
+    return el('div', { class: 'recent' }, [
+      el('span', { class: 'recent__label', text: 'Recently viewed' }),
+      el(
+        'div',
+        { class: 'recent__chips' },
+        spots.map((s) =>
+          el('button', {
+            class: 'recent__chip',
+            type: 'button',
+            text: s.name,
+            title: s.area,
+            onclick: () => jumpToCard(s.id),
+          })
+        )
+      ),
+    ]);
+  }
+
+  function updateIntroTip() {
+    const tip = $('#intro-tip');
+    if (tip) tip.hidden = !!state.prefs.tipsSeen;
   }
 
   // ---------------------------------------------------------------------------
@@ -1198,6 +1361,7 @@
     // `rerender: false` skips the full card rebuild — used for note auto-saves so
     // the focused textarea (and the mobile keyboard) aren't torn down mid-edit.
     const rerender = !(opts && opts.rerender === false);
+    recordRecent(spot.id); // engaging with a spot counts as viewing it
     const existing = Logic.myEntry(state.entries, spot.id, state.profile.id) || {};
     const merged = Logic.normalizeEntry({
       spotId: spot.id,
@@ -1402,6 +1566,7 @@
     window.addEventListener(
       'scroll',
       () => {
+        saveListScroll();
         if (scrollRaf) return;
         scrollRaf = requestAnimationFrame(() => {
           scrollRaf = null;
@@ -1411,6 +1576,24 @@
       { passive: true }
     );
     window.addEventListener('resize', updateScrollTopBtn, { passive: true });
+    // Capture the exact final scroll position when leaving/hiding the tab, since
+    // the throttled scroll handler may miss the last movement.
+    window.addEventListener('pagehide', () => {
+      if (state.prefs.view === 'list') {
+        state.prefs.listScroll = Math.round(window.scrollY);
+        savePrefs();
+      }
+    });
+
+    // First-run tip dismissal.
+    const tipClose = $('#intro-tip-close');
+    if (tipClose) {
+      tipClose.addEventListener('click', () => {
+        state.prefs.tipsSeen = true;
+        savePrefs();
+        updateIntroTip();
+      });
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1418,14 +1601,8 @@
   // ---------------------------------------------------------------------------
   function init() {
     applyTheme(currentTheme());
-    state.prefs = Object.assign(state.prefs, readJSON(PREFS_KEY, {}));
+    state.prefs = sanitizePrefs(readJSON(PREFS_KEY, null));
     state.profile = readJSON(PROFILE_KEY, null);
-
-    // Migrate the legacy "swimmable only" flag to the new category filter.
-    if (!state.prefs.category) {
-      state.prefs.category = state.prefs.swimmableOnly ? 'swim' : 'all';
-    }
-    delete state.prefs.swimmableOnly;
 
     // Restore the map detail panel the user last had open (map view only).
     selectedDetailId = state.prefs.detailId || null;
