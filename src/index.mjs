@@ -56,6 +56,7 @@ export function rowToEntry(row) {
     authorId: row.author_id,
     authorName: row.author_name,
     visited: !!row.visited,
+    wantToVisit: !!row.want_to_visit,
     rating: row.rating == null ? 0 : Number(row.rating),
     comment: row.comment || '',
     swamHere: !!row.swam_here,
@@ -193,6 +194,7 @@ async function putEntry(request, env) {
     author_id: authorId,
     author_name: String(body.authorName || 'Anonymous').slice(0, 60),
     visited: body.visited ? 1 : 0,
+    want_to_visit: body.wantToVisit ? 1 : 0,
     rating: clampRating(body.rating),
     comment: String(body.comment || '').slice(0, NOTE_MAX),
     swam_here: body.swamHere ? 1 : 0,
@@ -200,21 +202,23 @@ async function putEntry(request, env) {
   };
 
   await env.DB.prepare(
-    `INSERT INTO entries (spot_id, author_id, author_name, visited, rating, comment, swam_here, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO entries (spot_id, author_id, author_name, visited, want_to_visit, rating, comment, swam_here, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(spot_id, author_id) DO UPDATE SET
-       author_name = excluded.author_name,
-       visited     = excluded.visited,
-       rating      = excluded.rating,
-       comment     = excluded.comment,
-       swam_here   = excluded.swam_here,
-       updated_at  = excluded.updated_at`
+       author_name   = excluded.author_name,
+       visited       = excluded.visited,
+       want_to_visit = excluded.want_to_visit,
+       rating        = excluded.rating,
+       comment       = excluded.comment,
+       swam_here     = excluded.swam_here,
+       updated_at    = excluded.updated_at`
   )
     .bind(
       entry.spot_id,
       entry.author_id,
       entry.author_name,
       entry.visited,
+      entry.want_to_visit,
       entry.rating,
       entry.comment,
       entry.swam_here,

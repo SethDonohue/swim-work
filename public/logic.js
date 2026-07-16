@@ -137,6 +137,19 @@ const Logic = {
     return set;
   },
 
+  /**
+   * Set of spot ids the given user has marked "want to visit". Personal to that
+   * author — used to drive the wishlist filter on the list + map.
+   */
+  wantToVisitIds(entries, authorId) {
+    const set = new Set();
+    if (!authorId) return set;
+    for (const e of entries || []) {
+      if (e.authorId === authorId && e.wantToVisit) set.add(e.spotId);
+    }
+    return set;
+  },
+
   /** True when a spot has finite numeric coordinates we can map. */
   hasCoords(spot) {
     return (
@@ -271,6 +284,8 @@ const Logic = {
   /** Does a spot pass the active filters? */
   spotMatchesFilters(spot, filters) {
     const f = filters || {};
+    // "Want to visit" wishlist filter — only spots the user has bookmarked.
+    if (f.wantOnly && !(f.wantIds && f.wantIds.has(spot.id))) return false;
     if (f.area && f.area !== 'All' && spot.area !== f.area) return false;
     // `category` supersedes the legacy `swimmableOnly` flag ('swim' == old behavior).
     const category = f.category || (f.swimmableOnly ? 'swim' : 'all');
@@ -349,13 +364,18 @@ const Logic = {
       authorId: String(raw.authorId),
       authorName: String(raw.authorName || 'Anonymous').slice(0, 60),
       visited: !!raw.visited,
+      wantToVisit: !!raw.wantToVisit,
       rating: Logic.coerceRating(raw.rating),
       comment: String(raw.comment || '').slice(0, Logic.NOTE_MAX),
       swamHere: !!raw.swamHere,
       updatedAt: raw.updatedAt || new Date().toISOString(),
     };
     const isEmpty =
-      !entry.visited && entry.rating === 0 && !entry.comment.trim() && !entry.swamHere;
+      !entry.visited &&
+      !entry.wantToVisit &&
+      entry.rating === 0 &&
+      !entry.comment.trim() &&
+      !entry.swamHere;
     return isEmpty ? { ...entry, _empty: true } : entry;
   },
 

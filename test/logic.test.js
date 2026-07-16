@@ -265,6 +265,41 @@ test('normalizeEntry keeps a swamHere-only entry and round-trips the flag', () =
   assert.equal(none._empty, true);
 });
 
+test('normalizeEntry keeps a wantToVisit-only entry and round-trips the flag', () => {
+  const wantOnly = Logic.normalizeEntry({ spotId: 's1', authorId: 'me', wantToVisit: true });
+  assert.equal(wantOnly.wantToVisit, true);
+  assert.ok(!wantOnly._empty, 'a lone "want to visit" bookmark is worth storing');
+
+  const none = Logic.normalizeEntry({ spotId: 's1', authorId: 'me', wantToVisit: false });
+  assert.equal(none._empty, true);
+});
+
+test('wantToVisitIds returns only the given author\'s bookmarked spots', () => {
+  const entries = [
+    { spotId: 's1', authorId: 'me', wantToVisit: true },
+    { spotId: 's2', authorId: 'me', wantToVisit: false },
+    { spotId: 's3', authorId: 'me', wantToVisit: true },
+    { spotId: 's4', authorId: 'other', wantToVisit: true }, // someone else's list
+  ];
+  const ids = Logic.wantToVisitIds(entries, 'me');
+  assert.equal(ids.has('s1'), true);
+  assert.equal(ids.has('s3'), true);
+  assert.equal(ids.has('s2'), false);
+  assert.equal(ids.has('s4'), false, "another author's bookmark is excluded");
+  assert.equal(Logic.wantToVisitIds(entries, '').size, 0, 'no author -> empty set');
+});
+
+test('spotMatchesFilters wantOnly keeps only wishlist spots', () => {
+  const a = { id: 's1', area: 'West Seattle' };
+  const b = { id: 's2', area: 'West Seattle' };
+  const wantIds = new Set(['s1']);
+  assert.equal(Logic.spotMatchesFilters(a, { wantOnly: true, wantIds }), true);
+  assert.equal(Logic.spotMatchesFilters(b, { wantOnly: true, wantIds }), false);
+  // Off (or no set) leaves everything visible.
+  assert.equal(Logic.spotMatchesFilters(b, { wantOnly: false, wantIds }), true);
+  assert.equal(Logic.spotMatchesFilters(a, { wantOnly: true }), false, 'no wantIds -> nothing matches');
+});
+
 test('myEntry / upsertEntry round-trip by (spotId, authorId)', () => {
   let entries = [];
   const a = { spotId: 's1', authorId: 'me', visited: true, rating: 4, comment: 'hi' };

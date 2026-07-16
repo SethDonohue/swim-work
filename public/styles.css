@@ -304,6 +304,37 @@ input {
   font-weight: 600;
   cursor: pointer;
 }
+/* Wishlist ("Want to visit") filter toggle in the area row. */
+.pill-toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-soft);
+  border-radius: 999px;
+  padding: 0.42rem 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pill-toggle:hover {
+  border-color: var(--star);
+  color: var(--text);
+}
+.pill-toggle.is-active {
+  border-color: var(--star);
+  color: #8a6a12;
+  background: color-mix(in srgb, var(--star) 22%, transparent);
+}
+.pill-toggle__icon {
+  color: var(--star);
+  font-size: 1rem;
+  line-height: 1;
+}
+
 .area-select:focus {
   outline: 2px solid color-mix(in srgb, var(--primary) 55%, transparent);
   border-color: var(--primary);
@@ -763,6 +794,11 @@ input {
   color: #6b52c9;
   background: color-mix(in srgb, #6b52c9 14%, transparent);
 }
+.badge--want {
+  border-color: var(--star);
+  color: #b8860d;
+  background: color-mix(in srgb, var(--star) 20%, transparent);
+}
 .badge--community {
   border-color: #c9527f;
   color: #c9527f;
@@ -862,6 +898,19 @@ input {
   width: 1.05rem;
   height: 1.05rem;
   accent-color: var(--accent);
+}
+.want {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.want input {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--star);
 }
 .stars {
   display: inline-flex;
