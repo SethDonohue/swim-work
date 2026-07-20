@@ -81,6 +81,11 @@
   let selectedDetailId = null; // spot whose full card is shown in the panel under the map
   let restoreMapCam = false; // one-shot: on first map render, restore the saved camera instead of fitting
   let fitNext = false; // one-shot: reframe (fit all markers) on the next map render (set by filter/finder actions)
+  let centerOriginNext = false; // one-shot: center on the finder origin at a neighborhood zoom (used by "My location")
+
+  // Neighborhood framing for "My location": show roughly one square mile around
+  // the user (~1 mile ≈ 1609 m), matching what typical map apps do.
+  const MY_LOCATION_METERS = 1609;
 
   // Add/edit-spot modal state.
   let editingSpotId = null; // null = creating a new spot
@@ -823,14 +828,18 @@
     window.scrollTo({ top: Math.max(0, docOffset - beforeTop), behavior: 'auto' });
   }
 
-  function setOrigin(origin, { preserveView = false } = {}) {
+  function setOrigin(origin, { preserveView = false, centerOnOrigin = false } = {}) {
     state.prefs.origin = origin;
     savePrefs();
-    // A map click is already framed by the user, so keep their view; an address
-    // search / geolocation fits the origin + recommendations into view instead.
+    // A map click is already framed by the user, so keep their view; "My location"
+    // centers on the user at a neighborhood zoom; an address search fits the
+    // origin + recommendations into view instead.
     preserveMapView = preserveView;
     if (preserveView) {
       renderKeepingMapStable();
+    } else if (centerOnOrigin) {
+      centerOriginNext = true; // zoom to ~1 sq mile around the user's location
+      render();
     } else {
       fitNext = true; // frame the origin + recommendations
       render();
@@ -1099,6 +1108,11 @@
     restoreMapCam = false;
     const explicitFit = fitNext && !preserveView;
     fitNext = false;
+    // One-shot "My location" centering wins over a generic fit (but not over an
+    // explicit single-spot focus). Only valid when we have a mappable origin.
+    const centerOrigin =
+      centerOriginNext && !preserveView && !focusSpot && origin && Logic.hasCoords(origin);
+    centerOriginNext = false;
 
     // The container may have just been un-hidden, so its size needs recomputing
     // before any setView/fitBounds so the math uses the real dimensions.
@@ -1107,6 +1121,12 @@
       if (focusSpot && Logic.hasCoords(focusSpot)) {
         map.flyTo([focusSpot.lat, focusSpot.lng], 15, { duration: 0.6 });
         if (focusMarker) focusMarker.openPopup();
+      } else if (centerOrigin) {
+        // Frame ~1 square mile around the user so nearby streets/spots are legible.
+        map.fitBounds(L.latLng(origin.lat, origin.lng).toBounds(MY_LOCATION_METERS), {
+          padding: [20, 20],
+          maxZoom: 16,
+        });
       } else if (doFirstRestore) {
         map.setView([cam.lat, cam.lng], cam.zoom);
       } else if (explicitFit && points.length) {
@@ -1533,7 +1553,10 @@
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           status.textContent = '';
-          setOrigin({ lat: pos.coords.latitude, lng: pos.coords.longitude, label: 'Your location' });
+          setOrigin(
+            { lat: pos.coords.latitude, lng: pos.coords.longitude, label: 'Your location' },
+            { centerOnOrigin: true }
+          );
         },
         () => {
           status.textContent = 'Could not get your location (permission denied?).';
