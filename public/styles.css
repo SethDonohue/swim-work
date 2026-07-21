@@ -861,6 +861,41 @@ input {
 .card__map:hover {
   text-decoration: underline;
 }
+.card__coords {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+}
+.card__coords-label {
+  font-weight: 700;
+  color: var(--text-soft);
+  letter-spacing: 0.02em;
+}
+.card__coords-val {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--primary);
+  text-decoration: none;
+}
+.card__coords-val:hover {
+  text-decoration: underline;
+}
+.card__coords-copy {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.5rem;
+}
+.mappop__coords {
+  display: inline-block;
+  margin: 0.15rem 0 0.1rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  color: var(--primary);
+  text-decoration: none;
+}
+.mappop__coords:hover {
+  text-decoration: underline;
+}
 .card__owner-btn {
   font-size: 0.8rem;
   padding: 0.3rem 0.55rem;

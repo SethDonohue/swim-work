@@ -264,6 +264,22 @@ const Logic = {
     return `https://www.google.com/maps/search/?api=1&query=${query}`;
   },
 
+  /** "lat, lng" to 5 decimals (~1 m). Empty string when coords are missing. */
+  formatCoords(spot) {
+    if (!Logic.hasCoords(spot)) return '';
+    return `${spot.lat.toFixed(5)}, ${spot.lng.toFixed(5)}`;
+  },
+
+  /**
+   * Google Maps link that drops a pin at the exact coordinates — a reliable
+   * backup for obscure spots (e.g. street ends) whose name/address search
+   * doesn't resolve. Falls back to the name search when coords are missing.
+   */
+  buildGeoUrl(spot) {
+    if (!Logic.hasCoords(spot)) return Logic.buildMapUrl(spot);
+    return `https://www.google.com/maps/search/?api=1&query=${spot.lat},${spot.lng}`;
+  },
+
   /** Clamp a rating to an integer 0–5 (0 == no rating). */
   coerceRating(value) {
     const n = Math.round(Number(value));

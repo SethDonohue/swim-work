@@ -513,6 +513,40 @@
     });
   }
 
+  // Copy coordinates to the clipboard, with a brief "Copied ✓" confirmation.
+  // Falls back to a hidden textarea + execCommand where the async API is blocked.
+  function copyCoords(text, btn) {
+    const confirm = () => {
+      if (!btn) return;
+      const orig = btn.textContent;
+      btn.textContent = 'Copied ✓';
+      setTimeout(() => {
+        btn.textContent = orig;
+      }, 1200);
+    };
+    const fallback = () => {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'absolute';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        confirm();
+      } catch (_) {
+        /* clipboard unavailable — the value is still visible to select manually */
+      }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(confirm).catch(fallback);
+    } else {
+      fallback();
+    }
+  }
+
   function renderCard(spot) {
     const mine = Logic.myEntry(state.entries, spot.id, state.profile.id);
     const visited = !!(mine && mine.visited);
@@ -601,6 +635,34 @@
       }
     }
     card.appendChild(linkRow);
+
+    // GPS coordinates — a reliable backup when the Maps name/address link doesn't
+    // resolve (e.g. obscure street ends). The value links to the exact map point
+    // and can be copied to paste into any navigation app.
+    const coordsText = Logic.formatCoords(spot);
+    if (coordsText) {
+      const copyBtn = el('button', {
+        class: 'btn btn--ghost card__coords-copy',
+        type: 'button',
+        text: 'Copy',
+        title: 'Copy coordinates',
+      });
+      copyBtn.addEventListener('click', () => copyCoords(coordsText, copyBtn));
+      card.appendChild(
+        el('div', { class: 'card__coords' }, [
+          el('span', { class: 'card__coords-label', text: 'GPS' }),
+          el('a', {
+            class: 'card__coords-val',
+            href: Logic.buildGeoUrl(spot),
+            target: '_blank',
+            rel: 'noopener',
+            text: coordsText,
+            title: 'Open this exact point in Google Maps',
+          }),
+          copyBtn,
+        ])
+      );
+    }
 
     // ---- the user's own controls ----
     const visitedCheckbox = el('input', { type: 'checkbox' });
@@ -1005,12 +1067,23 @@
 
   function buildPopup(spot) {
     const disp = Logic.displaySwimType(spot, state.entries);
+    const coordsText = Logic.formatCoords(spot);
     return el('div', { class: 'mappop' }, [
       el('span', { class: 'mappop__area', text: spot.area }),
       el('h3', { class: 'mappop__title', text: spot.name }),
       el('span', { class: badgeClassForSwim(disp.type), text: disp.type }),
       el('p', { class: 'mappop__swim', text: spot.swim }),
       waterChip(spot),
+      coordsText
+        ? el('a', {
+            class: 'mappop__coords',
+            href: Logic.buildGeoUrl(spot),
+            target: '_blank',
+            rel: 'noopener',
+            text: '📍 GPS ' + coordsText,
+            title: 'Open this exact point in Google Maps',
+          })
+        : null,
       el('div', { class: 'mappop__actions' }, [
         el('button', {
           class: 'btn btn--primary mappop__btn',

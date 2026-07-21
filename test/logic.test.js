@@ -48,6 +48,21 @@ test('buildMapUrl encodes name + address', () => {
   assert.match(url, /Alki%20Beach/);
 });
 
+test('formatCoords renders lat/lng to 5 decimals, empty without coords', () => {
+  assert.equal(Logic.formatCoords({ lat: 47.6205, lng: -122.3493 }), '47.62050, -122.34930');
+  assert.equal(Logic.formatCoords({ lat: 47, lng: -122 }), '47.00000, -122.00000');
+  assert.equal(Logic.formatCoords({}), '');
+  assert.equal(Logic.formatCoords({ lat: 'x', lng: 1 }), '');
+});
+
+test('buildGeoUrl drops a pin at exact coords, falls back to name search', () => {
+  const url = Logic.buildGeoUrl({ name: 'E Mercer St End', lat: 47.6205, lng: -122.3493 });
+  assert.match(url, /^https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=47\.6205,-122\.3493$/);
+  // No coords -> reuse the name/address search link.
+  const fallback = Logic.buildGeoUrl({ name: 'Alki Beach', address: '1702 Alki Ave SW' });
+  assert.match(fallback, /query=Alki%20Beach/);
+});
+
 test('swimTypeColor returns a hex color per type with a fallback', () => {
   assert.equal(Logic.swimTypeColor('Lifeguarded beach'), '#1f9d55');
   assert.equal(Logic.swimTypeColor('Heated pool'), '#0d7fb8');
