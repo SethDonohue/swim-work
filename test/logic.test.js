@@ -315,6 +315,42 @@ test('spotMatchesFilters wantOnly keeps only wishlist spots', () => {
   assert.equal(Logic.spotMatchesFilters(a, { wantOnly: true }), false, 'no wantIds -> nothing matches');
 });
 
+test('normalizeEntry keeps a favorite-only entry and round-trips the flag', () => {
+  const favOnly = Logic.normalizeEntry({ spotId: 's1', authorId: 'me', favorite: true });
+  assert.equal(favOnly.favorite, true);
+  assert.ok(!favOnly._empty, 'a lone favorite is worth storing');
+
+  const none = Logic.normalizeEntry({ spotId: 's1', authorId: 'me', favorite: false });
+  assert.equal(none._empty, true);
+});
+
+test("favoriteIds returns only the given author's favorites", () => {
+  const entries = [
+    { spotId: 's1', authorId: 'me', favorite: true },
+    { spotId: 's2', authorId: 'me', favorite: false },
+    { spotId: 's3', authorId: 'me', favorite: true },
+    { spotId: 's4', authorId: 'other', favorite: true },
+  ];
+  const ids = Logic.favoriteIds(entries, 'me');
+  assert.equal(ids.has('s1'), true);
+  assert.equal(ids.has('s3'), true);
+  assert.equal(ids.has('s2'), false);
+  assert.equal(ids.has('s4'), false, "another author's favorite is excluded");
+  assert.equal(Logic.favoriteIds(entries, '').size, 0, 'no author -> empty set');
+});
+
+test('spotMatchesFilters favOnly (and combined with wantOnly) filter correctly', () => {
+  const a = { id: 's1', area: 'X' };
+  const b = { id: 's2', area: 'X' };
+  const favIds = new Set(['s1']);
+  const wantIds = new Set(['s1', 's2']);
+  assert.equal(Logic.spotMatchesFilters(a, { favOnly: true, favIds }), true);
+  assert.equal(Logic.spotMatchesFilters(b, { favOnly: true, favIds }), false);
+  // Both filters on == intersection (AND): only s1 is both a fav and a To See.
+  assert.equal(Logic.spotMatchesFilters(a, { favOnly: true, favIds, wantOnly: true, wantIds }), true);
+  assert.equal(Logic.spotMatchesFilters(b, { favOnly: true, favIds, wantOnly: true, wantIds }), false);
+});
+
 test('myEntry / upsertEntry round-trip by (spotId, authorId)', () => {
   let entries = [];
   const a = { spotId: 's1', authorId: 'me', visited: true, rating: 4, comment: 'hi' };

@@ -245,9 +245,11 @@ input {
   gap: 0.75rem;
   flex-wrap: wrap;
   align-items: center;
+  min-width: 0;
 }
 .filters__search {
   flex: 1 1 280px;
+  min-width: 0;
   padding: 0.6rem 0.85rem;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -281,10 +283,28 @@ input {
   color: var(--primary-ink);
   border-color: var(--primary);
 }
+/* Area dropdown + personal filter pills. Wraps so the pills line up under the
+   dropdown on narrow/mobile widths (and never force a page-wide overflow). */
 .area-filter {
   display: flex;
   align-items: center;
+  gap: 0.5rem 0.75rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.area-filter__pick {
+  display: flex;
+  align-items: center;
   gap: 0.5rem;
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.area-filter__toggles {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  flex: 0 1 auto;
 }
 .area-filter__label {
   font-size: 0.85rem;
@@ -292,9 +312,9 @@ input {
   color: var(--text-soft);
 }
 .area-select {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
-  max-width: 320px;
+  max-width: 420px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
@@ -304,7 +324,7 @@ input {
   font-weight: 600;
   cursor: pointer;
 }
-/* Wishlist ("Want to visit") filter toggle in the area row. */
+/* Personal filter toggles ("To See" / "Favs") in the area row. */
 .pill-toggle {
   flex: none;
   display: inline-flex;
@@ -333,6 +353,18 @@ input {
   color: var(--star);
   font-size: 1rem;
   line-height: 1;
+}
+/* Favorite variant (heart / pink). */
+.pill-toggle--fav .pill-toggle__icon {
+  color: #e0467c;
+}
+.pill-toggle--fav:hover {
+  border-color: #e0467c;
+}
+.pill-toggle--fav.is-active {
+  border-color: #e0467c;
+  color: #b02a5b;
+  background: color-mix(in srgb, #e0467c 18%, transparent);
 }
 
 .area-select:focus {
@@ -663,6 +695,31 @@ input {
   margin: 0;
   font-size: 0.82rem;
 }
+.mappop__toggles {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem 0.85rem;
+  flex-wrap: wrap;
+}
+.mappop__want,
+.mappop__fav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mappop__want input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--star);
+}
+.mappop__fav input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #e0467c;
+}
 .mappop__actions {
   display: flex;
   align-items: center;
@@ -798,6 +855,11 @@ input {
   border-color: var(--star);
   color: #b8860d;
   background: color-mix(in srgb, var(--star) 20%, transparent);
+}
+.badge--fav {
+  border-color: #e0467c;
+  color: #c0396b;
+  background: color-mix(in srgb, #e0467c 16%, transparent);
 }
 .badge--community {
   border-color: #c9527f;
@@ -946,6 +1008,19 @@ input {
   width: 1.05rem;
   height: 1.05rem;
   accent-color: var(--star);
+}
+.fav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.fav input {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: #e0467c;
 }
 .stars {
   display: inline-flex;

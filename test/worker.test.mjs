@@ -51,13 +51,13 @@ function makeMockDB(initialRows = [], initialUserSpots = []) {
         },
         async run() {
           if (/^\s*INSERT INTO entries/.test(sql)) {
-            const [spot_id, author_id, author_name, visited, want_to_visit, rating, comment, swam_here, updated_at] =
+            const [spot_id, author_id, author_name, visited, want_to_visit, favorite, rating, comment, swam_here, updated_at] =
               this.args;
             const existing = rows.find((r) => r.spot_id === spot_id && r.author_id === author_id);
             if (existing) {
-              Object.assign(existing, { author_name, visited, want_to_visit, rating, comment, swam_here, updated_at });
+              Object.assign(existing, { author_name, visited, want_to_visit, favorite, rating, comment, swam_here, updated_at });
             } else {
-              rows.push({ spot_id, author_id, author_name, visited, want_to_visit, rating, comment, swam_here, updated_at });
+              rows.push({ spot_id, author_id, author_name, visited, want_to_visit, favorite, rating, comment, swam_here, updated_at });
             }
           } else if (/^\s*DELETE FROM entries/.test(sql)) {
             const [spot_id, author_id] = this.args;
@@ -106,6 +106,7 @@ test('GET /api/entries returns mapped entries', async () => {
     authorName: 'A',
     visited: true,
     wantToVisit: false,
+    favorite: false,
     rating: 5,
     comment: 'hi',
     swamHere: false,
@@ -148,6 +149,24 @@ test('PUT /api/entries persists and returns the wantToVisit flag', async () => {
 
   const get = await worker.fetch(req('/api/entries'), { DB, ASSETS: assets });
   assert.equal((await get.json()).entries[0].wantToVisit, true);
+});
+
+test('PUT /api/entries persists and returns the favorite flag', async () => {
+  const DB = makeMockDB();
+  const res = await worker.fetch(
+    req('/api/entries', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ spotId: 's1', authorId: 'a', favorite: true }),
+    }),
+    { DB, ASSETS: assets }
+  );
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).entry.favorite, true);
+  assert.equal(DB.rows()[0].favorite, 1, 'stored as 0/1');
+
+  const get = await worker.fetch(req('/api/entries'), { DB, ASSETS: assets });
+  assert.equal((await get.json()).entries[0].favorite, true);
 });
 
 test('PUT /api/entries upserts (no duplicate) and clamps rating', async () => {

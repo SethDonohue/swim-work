@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS entries (
   author_id   TEXT    NOT NULL,
   author_name TEXT    NOT NULL DEFAULT 'Anonymous',
   visited       INTEGER NOT NULL DEFAULT 0,   -- 0/1
-  want_to_visit INTEGER NOT NULL DEFAULT 0,    -- 0/1: user's "want to visit" wishlist flag
+  want_to_visit INTEGER NOT NULL DEFAULT 0,    -- 0/1: user's "To See" (want to visit) flag
+  favorite      INTEGER NOT NULL DEFAULT 0,    -- 0/1: user's favorite flag
   rating        INTEGER,                       -- 0–5 (0 / NULL == unrated)
   comment       TEXT,                          -- note; capped at 250 chars in code
   swam_here     INTEGER NOT NULL DEFAULT 0,    -- 0/1: user reports swimming here; flips a "No swimming" spot to "Swim-possible"
@@ -20,6 +21,7 @@ CREATE TABLE IF NOT EXISTS entries (
 -- CREATE TABLE above):
 --   ALTER TABLE entries ADD COLUMN swam_here INTEGER NOT NULL DEFAULT 0;
 --   ALTER TABLE entries ADD COLUMN want_to_visit INTEGER NOT NULL DEFAULT 0;
+--   ALTER TABLE entries ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS idx_entries_spot ON entries (spot_id);
 CREATE INDEX IF NOT EXISTS idx_entries_author ON entries (author_id);

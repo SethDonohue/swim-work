@@ -33,7 +33,8 @@
       area: 'All',
       query: '',
       category: 'all', // 'all' | 'swim' | 'play' | 'work'
-      wantOnly: false, // show only spots the user marked "want to visit"
+      wantOnly: false, // show only spots the user marked "To See"
+      favOnly: false, // show only spots the user marked favorite
       view: 'list',
       units: 'mi', // 'mi' | 'km' — distance units in the finder
       origin: null, // { lat, lng, label } for the "nearest swim" finder
@@ -66,9 +67,11 @@
   // Current prefs plus the set of community-reported swimmable spot ids, so the
   // Swim filter includes "Swim-possible" spots. Recomputed per call (cheap).
   function activeFilters() {
+    const authorId = state.profile ? state.profile.id : '';
     return Object.assign({}, state.prefs, {
       reportedSwimIds: Logic.reportedSwimIds(allSpots(), state.entries),
-      wantIds: Logic.wantToVisitIds(state.entries, state.profile ? state.profile.id : ''),
+      wantIds: Logic.wantToVisitIds(state.entries, authorId),
+      favIds: Logic.favoriteIds(state.entries, authorId),
     });
   }
 
@@ -163,6 +166,7 @@
     out.query = typeof raw.query === 'string' ? raw.query : '';
     out.showOthers = !!raw.showOthers;
     out.wantOnly = !!raw.wantOnly;
+    out.favOnly = !!raw.favOnly;
     out.units = raw.units === 'km' ? 'km' : 'mi';
     out.tipsSeen = !!raw.tipsSeen;
     out.detailId = typeof raw.detailId === 'string' ? raw.detailId : null;
@@ -582,7 +586,10 @@
       badges.push(el('span', { class: 'badge badge--work-ok', text: '💻 Work-friendly' }));
     }
     if (mine && mine.wantToVisit) {
-      badges.push(el('span', { class: 'badge badge--want', text: '⭐ Want to visit' }));
+      badges.push(el('span', { class: 'badge badge--want', text: '⭐ To See' }));
+    }
+    if (mine && mine.favorite) {
+      badges.push(el('span', { class: 'badge badge--fav', text: '❤️ Fav' }));
     }
     if (Logic.isUserSubmitted(spot)) {
       badges.push(el('span', { class: 'badge badge--community', text: '👥 Community' }));
@@ -677,6 +684,12 @@
       saveField(spot, { wantToVisit: wantCheckbox.checked })
     );
 
+    const favCheckbox = el('input', { type: 'checkbox' });
+    favCheckbox.checked = !!(mine && mine.favorite);
+    favCheckbox.addEventListener('change', () =>
+      saveField(spot, { favorite: favCheckbox.checked })
+    );
+
     const comment = el('textarea', {
       class: 'comment',
       placeholder: 'Your note — wifi? outlets? shade? worth a swim? (one per spot)',
@@ -733,9 +746,13 @@
     const controls = el('div', { class: 'controls' }, [
       el('div', { class: 'controls__row' }, [
         el('label', { class: 'visited' }, [visitedCheckbox, document.createTextNode('Visited')]),
-        el('label', { class: 'want', title: 'Add to your want-to-visit list' }, [
+        el('label', { class: 'want', title: 'Add to your To See list' }, [
           wantCheckbox,
-          document.createTextNode('⭐ Want to visit'),
+          document.createTextNode('⭐ To See'),
+        ]),
+        el('label', { class: 'fav', title: 'Add to your favorites' }, [
+          favCheckbox,
+          document.createTextNode('❤️ Fav'),
         ]),
         renderStars(spot, mine),
       ]),
@@ -772,9 +789,15 @@
     const isEmpty = filtered.length === 0;
     $('#empty').hidden = !isEmpty;
     if (isEmpty) {
-      $('#empty').textContent = state.prefs.wantOnly
-        ? 'No spots on your want-to-visit list yet — check “⭐ Want to visit” on any spot to add it.'
-        : 'No spots match your filters.';
+      let msg = 'No spots match your filters.';
+      if (state.prefs.favOnly && state.prefs.wantOnly) {
+        msg = 'No spots are both favorites and on your To See list.';
+      } else if (state.prefs.favOnly) {
+        msg = 'No favorites yet — tap “❤️ Fav” on any spot to add one.';
+      } else if (state.prefs.wantOnly) {
+        msg = 'No spots on your To See list yet — tap “⭐ To See” on any spot to add one.';
+      }
+      $('#empty').textContent = msg;
     }
 
     if (mapView) {
@@ -1068,6 +1091,25 @@
   function buildPopup(spot) {
     const disp = Logic.displaySwimType(spot, state.entries);
     const coordsText = Logic.formatCoords(spot);
+    const mine = Logic.myEntry(state.entries, spot.id, state.profile.id);
+
+    // Quick "To See" / favorite toggles right in the popup. Persist without a
+    // full re-render so the popup (and the marker it's anchored to) stays open.
+    const wantCb = el('input', { type: 'checkbox' });
+    wantCb.checked = !!(mine && mine.wantToVisit);
+    wantCb.addEventListener('change', () =>
+      saveField(spot, { wantToVisit: wantCb.checked }, null, { rerender: false })
+    );
+    const favCb = el('input', { type: 'checkbox' });
+    favCb.checked = !!(mine && mine.favorite);
+    favCb.addEventListener('change', () =>
+      saveField(spot, { favorite: favCb.checked }, null, { rerender: false })
+    );
+    const toggleRow = el('div', { class: 'mappop__toggles' }, [
+      el('label', { class: 'mappop__want' }, [wantCb, document.createTextNode('⭐ To See')]),
+      el('label', { class: 'mappop__fav' }, [favCb, document.createTextNode('❤️ Fav')]),
+    ]);
+
     return el('div', { class: 'mappop' }, [
       el('span', { class: 'mappop__area', text: spot.area }),
       el('h3', { class: 'mappop__title', text: spot.name }),
@@ -1084,6 +1126,7 @@
             title: 'Open this exact point in Google Maps',
           })
         : null,
+      toggleRow,
       el('div', { class: 'mappop__actions' }, [
         el('button', {
           class: 'btn btn--primary mappop__btn',
@@ -1280,6 +1323,16 @@
     btn.setAttribute('aria-pressed', String(on));
     const icon = btn.querySelector('.pill-toggle__icon');
     if (icon) icon.textContent = on ? '★' : '☆';
+  }
+
+  function syncFavFilter() {
+    const btn = $('#fav-filter');
+    if (!btn) return;
+    const on = !!state.prefs.favOnly;
+    btn.classList.toggle('is-active', on);
+    btn.setAttribute('aria-pressed', String(on));
+    const icon = btn.querySelector('.pill-toggle__icon');
+    if (icon) icon.textContent = on ? '♥' : '♡';
   }
 
   function setView(view) {
@@ -1494,6 +1547,7 @@
       authorName: state.profile.name,
       visited: 'visited' in patch ? patch.visited : existing.visited,
       wantToVisit: 'wantToVisit' in patch ? patch.wantToVisit : existing.wantToVisit,
+      favorite: 'favorite' in patch ? patch.favorite : existing.favorite,
       rating: 'rating' in patch ? patch.rating : existing.rating,
       comment: 'comment' in patch ? patch.comment : existing.comment,
       swamHere: 'swamHere' in patch ? patch.swamHere : existing.swamHere,
@@ -1588,7 +1642,15 @@
       state.prefs.wantOnly = !state.prefs.wantOnly;
       savePrefs();
       syncWantFilter();
-      fitNext = true; // reframe the map to the wishlist
+      fitNext = true; // reframe the map to the filtered set
+      render();
+    });
+
+    $('#fav-filter').addEventListener('click', () => {
+      state.prefs.favOnly = !state.prefs.favOnly;
+      savePrefs();
+      syncFavFilter();
+      fitNext = true; // reframe the map to the filtered set
       render();
     });
 
@@ -1752,6 +1814,7 @@
     syncViewToggle();
     syncCategoryButtons();
     syncWantFilter();
+    syncFavFilter();
 
     if (state.profile && state.profile.id) {
       startSession(state.profile);

@@ -19,6 +19,7 @@ and you can filter to any of those.
 Each person signs in with a local profile and can:
 
 - ✅ **Check off** spots they've visited
+- ⭐ **Mark spots "To See"** and ❤️ **favorite** them, each with its own filter
 - ⭐ **Rate** each spot (0–5)
 - 📝 **Leave a note** per spot (one per person, editable, 250-char max)
 - 👀 **Toggle on other people's notes** to see what everyone else thinks
@@ -255,8 +256,8 @@ The Worker (`src/index.mjs`) exposes:
 4. [ ] **Lifeguard "open now" indicator.** Encode the seasonal lifeguard schedule
    + daily hours and show a live "Lifeguarded now / closed for season" badge on
    each beach.
-5. [ ] **Favorites & a "to-try" list.** Let users star spots into a personal
-   shortlist that's distinct from "visited", with a quick filter for each.
+5. [x] **Favorites & a "to-try" list.** ✅ Done: per-user ❤️ favorite and ⭐ "To See"
+   flags, each distinct from "visited" and each with its own quick filter.
 6. [~] **Distance, sort, and directions.** ✅ Done: the "nearest swim" finder takes
    any park/cafe/address (geocoded), your geolocation, or a map click and ranks
    swimmable spots by distance blended with community rating. Still to do: show

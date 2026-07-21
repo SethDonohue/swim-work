@@ -150,6 +150,19 @@ const Logic = {
     return set;
   },
 
+  /**
+   * Set of spot ids the given user has marked as a favorite. Personal to that
+   * author — drives the "Favs" filter on the list + map.
+   */
+  favoriteIds(entries, authorId) {
+    const set = new Set();
+    if (!authorId) return set;
+    for (const e of entries || []) {
+      if (e.authorId === authorId && e.favorite) set.add(e.spotId);
+    }
+    return set;
+  },
+
   /** True when a spot has finite numeric coordinates we can map. */
   hasCoords(spot) {
     return (
@@ -300,8 +313,9 @@ const Logic = {
   /** Does a spot pass the active filters? */
   spotMatchesFilters(spot, filters) {
     const f = filters || {};
-    // "Want to visit" wishlist filter — only spots the user has bookmarked.
+    // Personal "To See" (want-to-visit) and "Favs" filters — independent toggles.
     if (f.wantOnly && !(f.wantIds && f.wantIds.has(spot.id))) return false;
+    if (f.favOnly && !(f.favIds && f.favIds.has(spot.id))) return false;
     if (f.area && f.area !== 'All' && spot.area !== f.area) return false;
     // `category` supersedes the legacy `swimmableOnly` flag ('swim' == old behavior).
     const category = f.category || (f.swimmableOnly ? 'swim' : 'all');
@@ -381,6 +395,7 @@ const Logic = {
       authorName: String(raw.authorName || 'Anonymous').slice(0, 60),
       visited: !!raw.visited,
       wantToVisit: !!raw.wantToVisit,
+      favorite: !!raw.favorite,
       rating: Logic.coerceRating(raw.rating),
       comment: String(raw.comment || '').slice(0, Logic.NOTE_MAX),
       swamHere: !!raw.swamHere,
@@ -389,6 +404,7 @@ const Logic = {
     const isEmpty =
       !entry.visited &&
       !entry.wantToVisit &&
+      !entry.favorite &&
       entry.rating === 0 &&
       !entry.comment.trim() &&
       !entry.swamHere;
